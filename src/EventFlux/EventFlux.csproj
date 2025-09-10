@@ -1,0 +1,34 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<TargetFrameworks>net6.0;net7.0;net8.0;net9.0</TargetFrameworks>
+		<LangVersion>preview</LangVersion>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+		<GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+		<PackageId>EventFlux</PackageId>
+		<Version>1.1.9</Version>
+		<Authors>Kadir Demirkaya</Authors>
+		<PackageLicenseExpression>MIT</PackageLicenseExpression>
+		<Description>A lightweight event-based CQRS implementation for .NET applications.</Description>
+		<PackageProjectUrl>https://github.com/kadirdemirkaya/EventFlux</PackageProjectUrl>
+		<RepositoryUrl>https://github.com/kadirdemirkaya/EventFlux</RepositoryUrl>
+		<RepositoryType>git</RepositoryType>
+		<PackageTags>CQRS EventBus EventSourcing .NET</PackageTags>
+		<PackageReleaseNotes>Initial release with event-based CQRS support.</PackageReleaseNotes>
+		<AssemblyInformationalVersion>1.1.8</AssemblyInformationalVersion>
+		<PackageReadmeFile>README.md</PackageReadmeFile>
+		<PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<None Include="..\..\README.md" Pack="true" PackagePath="" />
+	</ItemGroup>
+	
+	<ItemGroup>
+		<PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="9.0.0" />
+		<PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.0" />
+		<PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="9.0.0" />
+	</ItemGroup>
+
+</Project>

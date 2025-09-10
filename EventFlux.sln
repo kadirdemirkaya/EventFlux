@@ -1,0 +1,42 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.12.35527.113
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{A8FF75A6-2170-4958-9E3F-97FE4A57F4A0}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "test", "test", "{E597F542-A096-446B-9EE9-B7C1525F2CCB}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EventFlux", "src\EventFlux\EventFlux.csproj", "{5B0F54B3-FD27-45E9-A5EE-2C18138F5749}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{DAAD7F7B-BD64-4CFF-8E5A-B548DC92E53B}"
+	ProjectSection(SolutionItems) = preProject
+		LICENSE.txt = LICENSE.txt
+		README.md = README.md
+	EndProjectSection
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EventFlux.Test", "test\EventFlux.Test\EventFlux.Test.csproj", "{D5F652B8-6A3F-46ED-9645-1805D2D509F5}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{5B0F54B3-FD27-45E9-A5EE-2C18138F5749}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5B0F54B3-FD27-45E9-A5EE-2C18138F5749}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5B0F54B3-FD27-45E9-A5EE-2C18138F5749}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5B0F54B3-FD27-45E9-A5EE-2C18138F5749}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D5F652B8-6A3F-46ED-9645-1805D2D509F5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D5F652B8-6A3F-46ED-9645-1805D2D509F5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D5F652B8-6A3F-46ED-9645-1805D2D509F5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D5F652B8-6A3F-46ED-9645-1805D2D509F5}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{5B0F54B3-FD27-45E9-A5EE-2C18138F5749} = {A8FF75A6-2170-4958-9E3F-97FE4A57F4A0}
+		{D5F652B8-6A3F-46ED-9645-1805D2D509F5} = {E597F542-A096-446B-9EE9-B7C1525F2CCB}
+	EndGlobalSection
+EndGlobal
