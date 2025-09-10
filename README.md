@@ -1,8 +1,9 @@
 ## NuGet Package Information
 
-[![NuGet](https://img.shields.io/nuget/v/EventFlux)](https://www.nuget.org/packages/EventFlux) &nbsp;
-[![Downloads](https://img.shields.io/nuget/dt/EventFlux)](https://www.nuget.org/packages/EventFlux) &nbsp;
-[![License](https://img.shields.io/nuget/l/EventFlux)](https://github.com/kadirdemirkaya/EventFlux/blob/main/LICENSE.txt)
+| Package | Downloads | License |
+|---------|-----------|---------|
+| [![NuGet](https://img.shields.io/nuget/v/EventFlux)](https://www.nuget.org/packages/EventFlux) | [![Downloads](https://img.shields.io/nuget/dt/EventFlux)](https://www.nuget.org/packages/EventFlux) | [![License](https://img.shields.io/nuget/l/EventFlux)](https://github.com/kadirdemirkaya/EventFlux/blob/main/LICENSE.txt) |
+
 
 
 # EventFlux
