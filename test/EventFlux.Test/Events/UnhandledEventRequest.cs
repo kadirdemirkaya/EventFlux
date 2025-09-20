@@ -1,4 +1,6 @@
-﻿namespace EventFlux.Test.Events
+﻿using EventFlux.Abstractions;
+
+namespace EventFlux.Test.Events
 {
 
     public class UnhandledEventRequest : IEventRequest<UnhandledEventResponse>

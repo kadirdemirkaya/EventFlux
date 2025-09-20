@@ -1,5 +1,7 @@
 ﻿
 
+using EventFlux.Abstractions;
+
 namespace EventFlux.Test.Events
 {
     public class SendEventRequest : IEventRequest<SendEventResponse>

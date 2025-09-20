@@ -1,4 +1,6 @@
-﻿using EventFlux.Test.Events;
+﻿using EventFlux.Abstractions;
+using EventFlux.Extensions;
+using EventFlux.Test.Events;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Moq;

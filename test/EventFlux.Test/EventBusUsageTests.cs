@@ -1,4 +1,6 @@
 ﻿using Castle.Core.Logging;
+using EventFlux.Abstractions;
+using EventFlux.Extensions;
 using EventFlux.Test.Events;
 using EventFlux.Test.Unit;
 using Microsoft.Extensions.DependencyInjection;

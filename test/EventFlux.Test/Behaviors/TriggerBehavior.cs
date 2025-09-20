@@ -1,4 +1,7 @@
 ﻿
+using EventFlux.Abstractions;
+using EventFlux.Delegates;
+
 namespace EventFlux.Test.Behaviors
 {
     public class TriggerBehavior<TRequest> : IEventCustomPipeline<TRequest>

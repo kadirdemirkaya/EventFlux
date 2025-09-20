@@ -9,7 +9,6 @@
 		<PackageId>EventFlux</PackageId>
 		<Version>1.1.9</Version>
 		<Authors>Kadir Demirkaya</Authors>
-		<PackageLicenseExpression>MIT</PackageLicenseExpression>
 		<PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
 		<Description>A lightweight event-based CQRS implementation for .NET applications.</Description>
 		<PackageProjectUrl>https://github.com/kadirdemirkaya/EventFlux</PackageProjectUrl>

@@ -1,4 +1,6 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using EventFlux.Abstractions;
+using EventFlux.Delegates;
+using Microsoft.Extensions.Logging;
 
 namespace EventFlux.Behaviors
 {
