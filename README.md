@@ -2,9 +2,7 @@
 
 | Package | Downloads | License |
 |---------|-----------|---------|
-| [![NuGet](https://img.shields.io/nuget/v/EventFlux)](https://www.nuget.org/packages/EventFlux) | [![Downloads](https://img.shields.io/nuget/dt/EventFlux)](https://www.nuget.org/packages/EventFlux) | [![License](https://img.shields.io/nuget/l/EventFlux)](https://github.com/kadirdemirkaya/EventFlux/blob/main/LICENSE.txt) |
-
-
+| [![NuGet](https://img.shields.io/nuget/v/EventFlux)](https://www.nuget.org/packages/EventFlux) | [![Downloads](https://img.shields.io/nuget/dt/EventFlux)](https://www.nuget.org/packages/EventFlux) | [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/kadirdemirkaya/EventFlux/blob/main/LICENSE.txt) |
 
 # EventFlux
 
@@ -138,3 +136,4 @@ dotnet test
 - **CanHandle**: Implement preconditions in handlers to control whether a handler should execute.
 - **Error Handling**: Catch exceptions within handlers to log or generate appropriate responses; unhandled exceptions may propagate depending on your implementation.
 - **Unit Tests**: Use mocks or isolated pipeline behaviors to test handler execution, timeouts, and cancellation tokens.
+
