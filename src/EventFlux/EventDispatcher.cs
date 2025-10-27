@@ -94,7 +94,17 @@ namespace EventFlux
 
                 EventHandlerDelegate handlerDelegate = async (cancellationToken) =>
                 {
-                    foreach (var handler in handlers)
+                    var orderedHandlers = handlers
+                       .OrderBy(h =>
+                       {
+                           var priorityProp = h.GetType().GetProperty("Priority");
+                           return priorityProp is not null
+                               ? (int)(priorityProp.GetValue(h) ?? 0)
+                               : 0;
+                       })
+                       .ToList();
+
+                    foreach (var handler in orderedHandlers)
                     {
                         var handleMethod = handler.GetType().GetMethod("Handle");
                         var canHandleMethod = handler.GetType().GetMethod("CanHandle");
