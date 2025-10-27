@@ -17,6 +17,7 @@ EventFlux is a lightweight and performance-focused event processing library for 
 - Add pipeline behaviors (e.g., validation, logging, cache)
 - Dynamic dispatch
 - Handler prerequisite query: Pre-evaluation with the `CanHandle` method
+- Handler ordering via attribute: Multiple handlers for the same request can be executed in a defined order using [HandlerOrder(int)] attribute. Lower order values are executed first.
 
 ## Quick Start
 

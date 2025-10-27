@@ -1,4 +1,5 @@
 ﻿using EventFlux.Abstractions;
+using EventFlux.Attributes;
 using EventFlux.Delegates;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -95,14 +96,13 @@ namespace EventFlux
                 EventHandlerDelegate handlerDelegate = async (cancellationToken) =>
                 {
                     var orderedHandlers = handlers
-                       .OrderBy(h =>
-                       {
-                           var priorityProp = h.GetType().GetProperty("Priority");
-                           return priorityProp is not null
-                               ? (int)(priorityProp.GetValue(h) ?? 0)
-                               : 0;
-                       })
-                       .ToList();
+                        .OrderBy(h =>
+                        {
+                            var type = h.GetType();
+                            var orderAttr = type.GetCustomAttribute<HandlerOrderAttribute>();
+                            return orderAttr?.Priority ?? 0;
+                        })
+                        .ToList();
 
                     foreach (var handler in orderedHandlers)
                     {

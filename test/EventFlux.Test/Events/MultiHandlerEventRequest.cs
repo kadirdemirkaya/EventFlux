@@ -1,4 +1,5 @@
 ﻿using EventFlux.Abstractions;
+using EventFlux.Attributes;
 
 namespace EventFlux.Test.Events
 {
@@ -7,11 +8,10 @@ namespace EventFlux.Test.Events
         public string Message { get; set; } = string.Empty;
     }
 
+    [HandlerOrder(2)]
     public class MultiHandlerEventHandler1 : IEventHandler<MultiHandlerEventRequest>
     {
         public static int HandledCount;
-
-        public int Priority => 2;
 
         public async Task Handle(MultiHandlerEventRequest request)
         {
@@ -19,10 +19,11 @@ namespace EventFlux.Test.Events
             Interlocked.Increment(ref HandledCount);
         }
     }
+
+    [HandlerOrder(1)]
     public class MultiHandlerEventHandler2 : IEventHandler<MultiHandlerEventRequest>
     {
         public static int HandledCount;
-        public int Priority => 1;
 
         public async Task Handle(MultiHandlerEventRequest request)
         {
