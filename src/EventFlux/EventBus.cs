@@ -1,4 +1,5 @@
 ﻿using EventFlux.Abstractions;
+using EventFlux.Attributes;
 using EventFlux.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -132,10 +133,9 @@ namespace EventFlux
                     var orderedHandlers = handlers
                         .OrderBy(h =>
                         {
-                            var priorityProp = h.GetType().GetProperty("Priority");
-                            return priorityProp is not null
-                                ? (int)(priorityProp.GetValue(h) ?? 0)
-                                : 0;
+                            var type = h.GetType();
+                            var orderAttr = type.GetCustomAttribute<HandlerOrderAttribute>();
+                            return orderAttr?.Priority ?? 0;
                         })
                         .ToList();
 
@@ -155,19 +155,13 @@ namespace EventFlux
                 var handlerEvents = _eventDictionaryService.GetHandlersForEvent(request.GetType());
 
                 var handlerInstances = handlerEvents
-                    .Select(type => new
+                    .Select(t => new
                     {
-                        Type = type,
-                        Instance = Activator.CreateInstance(type)
+                        Type = t,
+                        Instance = Activator.CreateInstance(t),
+                        Priority = t.GetCustomAttribute<HandlerOrderAttribute>()?.Priority ?? 0
                     })
-                    .Where(x => x.Instance is not null)
-                    .OrderBy(x =>
-                    {
-                        var priorityProp = x.Type.GetProperty("Priority");
-                        return priorityProp is not null
-                            ? (int)(priorityProp.GetValue(x.Instance) ?? 0)
-                            : 0;
-                    })
+                    .OrderBy(x => x.Priority) // küçük Order önce
                     .ToList();
 
                 if (handlerEvents is not null)
