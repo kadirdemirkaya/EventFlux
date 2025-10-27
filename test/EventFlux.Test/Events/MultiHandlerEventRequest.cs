@@ -11,6 +11,8 @@ namespace EventFlux.Test.Events
     {
         public static int HandledCount;
 
+        public int Priority => 2;
+
         public async Task Handle(MultiHandlerEventRequest request)
         {
             await Task.Delay(30);
@@ -20,6 +22,7 @@ namespace EventFlux.Test.Events
     public class MultiHandlerEventHandler2 : IEventHandler<MultiHandlerEventRequest>
     {
         public static int HandledCount;
+        public int Priority => 1;
 
         public async Task Handle(MultiHandlerEventRequest request)
         {

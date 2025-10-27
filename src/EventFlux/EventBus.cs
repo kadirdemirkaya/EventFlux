@@ -129,7 +129,17 @@ namespace EventFlux
 
                 if (scope.ServiceProvider.GetService(enumerableHandlerInterface) is IEnumerable<object> handlers)
                 {
-                    foreach (var handler in handlers)
+                    var orderedHandlers = handlers
+                        .OrderBy(h =>
+                        {
+                            var priorityProp = h.GetType().GetProperty("Priority");
+                            return priorityProp is not null
+                                ? (int)(priorityProp.GetValue(h) ?? 0)
+                                : 0;
+                        })
+                        .ToList();
+
+                    foreach (var handler in orderedHandlers)
                         await TryInvokeHandlerAsync(handlerInterface, handler, request);
                 }
                 else
@@ -143,13 +153,29 @@ namespace EventFlux
             else
             {
                 var handlerEvents = _eventDictionaryService.GetHandlersForEvent(request.GetType());
+
+                var handlerInstances = handlerEvents
+                    .Select(type => new
+                    {
+                        Type = type,
+                        Instance = Activator.CreateInstance(type)
+                    })
+                    .Where(x => x.Instance is not null)
+                    .OrderBy(x =>
+                    {
+                        var priorityProp = x.Type.GetProperty("Priority");
+                        return priorityProp is not null
+                            ? (int)(priorityProp.GetValue(x.Instance) ?? 0)
+                            : 0;
+                    })
+                    .ToList();
+
                 if (handlerEvents is not null)
                 {
-                    foreach (var handlerType in handlerEvents)
+                    foreach (var handlerType in handlerInstances)
                     {
                         var handlerInterface = typeof(IEventHandler<>).MakeGenericType(request.GetType());
-                        var handler = Activator.CreateInstance(handlerType);
-                        await TryInvokeHandlerAsync(handlerInterface, handler, request);
+                        await TryInvokeHandlerAsync(handlerInterface, handlerType.Instance, request);
                     }
                 }
                 else
