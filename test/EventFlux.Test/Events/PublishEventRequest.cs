@@ -10,7 +10,6 @@ namespace EventFlux.Test.Events
     {
         public static int HandledCount = 0;
 
-
         public async Task Handle(PublishEventRequest request)
         {
             await Task.Delay(50);

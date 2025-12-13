@@ -1,9 +1,11 @@
 ﻿using EventFlux.Abstractions;
 using EventFlux.Attributes;
+using EventFlux.Descriptors;
 using EventFlux.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System;
+using System.Collections.Concurrent;
 using System.Reflection;
 
 namespace EventFlux
@@ -20,6 +22,8 @@ namespace EventFlux
         private readonly EventService _eventDictionaryService;
         private EventStackService _eventStackDictionaryService;
         private readonly EventMapService _eventDictionaryMapService;
+
+        private readonly ConcurrentDictionary<Type, IReadOnlyList<HandlerDescriptor>> _handlerCache = new();
 
         public EventBus() { }
 
@@ -63,296 +67,117 @@ namespace EventFlux
             _eventStackDictionaryService = new();
         }
 
-        public async virtual Task<TResponse> SendAsync<TResponse>(IEventRequest<TResponse> request)
+        public async Task<TResponse?> SendAsync<TResponse>(
+            IEventRequest<TResponse> request)
             where TResponse : IEventResponse
         {
-            if (request == null)
+            if (request is null)
                 throw new ArgumentNullException(nameof(request));
 
-            if (_eventDictionaryMapService.GetValue(request.ToString(), out Type? responseType))
-            {
-                using var scope = _serviceProvider.CreateScope();
-                var handlerInterface = typeof(IEventHandler<,>).MakeGenericType(request.GetType(), responseType);
+            var handlerType = typeof(IEventHandler<,>).MakeGenericType(request.GetType(), typeof(TResponse));
 
-                var handler = scope.ServiceProvider.GetService(handlerInterface);
+            using var scope = _serviceProvider.CreateScope();
 
-                if (handler is null)
-                {
-                    var handlers = _eventDictionaryService.GetHandlersForEvent(request.GetType());
-                    if (handlers is null || handlers.Count == 0)
-                        return default;
+            var handler = scope.ServiceProvider.GetRequiredService(handlerType);
 
-                    foreach (var eventHandler in handlers)
-                    {
-                        var handlerInstance = Activator.CreateInstance(eventHandler);
-                        if (!TryInvokeHandler(handlerInterface, handlerInstance, request, out TResponse result))
-                            continue;
-                        return result;
-                    }
-                    return default;
-                }
+            var method = handlerType.GetMethod("Handle")!;
 
-                if (!TryInvokeHandler(handlerInterface, handler, request, out TResponse handlerResult))
-                    return default;
+            var task = (Task<TResponse>)method.Invoke(handler, new[] { request })!;
 
-                if (_eventDictionaryMapService.GetValue(request.GetType().ToString(), out var modelType))
-                    handlerResult = (TResponse)Convert.ChangeType(handlerResult, modelType);
-
-                return handlerResult;
-            }
-            else
-            {
-                if (!_isSendRetry)
-                {
-                    _isSendRetry = true;
-                    if (!_eventDictionaryMapService.InternalEventMaps.Any())
-                        _eventDictionaryMapService.FindEvents();
-                    await SendAsync(request);
-                }
-                else
-                {
-                    throw new InvalidOperationException($"No handler found for event {request.GetType().Name}");
-                }
-            }
-            return default;
+            return await task.ConfigureAwait(false);
         }
 
-        public virtual async Task PublishAsync(IEventRequest request)
+        public async Task PublishAsync(IEventRequest request)
         {
-            if (request == null)
+            if (request is null)
                 throw new ArgumentNullException(nameof(request));
 
-            if (!_isPublishRetry)
+            var eventType = request.GetType();
+
+            var descriptors = GetOrBuildHandlers(eventType);
+
+            if (descriptors.Count == 0)
+                return;
+
+            using var scope = _serviceProvider.CreateScope();
+
+            var handlerType = typeof(IEventHandler<>).MakeGenericType(eventType);
+
+            var handlers = scope.ServiceProvider.GetServices(handlerType).ToDictionary(h => h.GetType());
+
+            var tasks = descriptors.Select(async desc =>
             {
-                using var scope = _serviceProvider.CreateScope();
-                var handlerInterface = typeof(IEventHandler<>).MakeGenericType(request.GetType());
-                var enumerableHandlerInterface = typeof(IEnumerable<>).MakeGenericType(handlerInterface);
+                if (!handlers.TryGetValue(desc.HandlerType, out var handler))
+                    return;
 
-                if (scope.ServiceProvider.GetService(enumerableHandlerInterface) is IEnumerable<object> handlers)
-                {
-                    var orderedHandlers = handlers
-                        .OrderBy(h =>
-                        {
-                            var type = h.GetType();
-                            var orderAttr = type.GetCustomAttribute<HandlerOrderAttribute>();
-                            return orderAttr?.Priority ?? 0;
-                        })
-                        .ToList();
+                if (desc.CanHandleMethod != null && desc.CanHandleMethod.Invoke(handler, new[] { request }) is false)
+                    return;
 
-                    foreach (var handler in orderedHandlers)
-                        await TryInvokeHandlerAsync(handlerInterface, handler, request);
-                }
-                else
-                {
-                    _isPublishRetry = true;
-                    if (!_eventDictionaryService.InternalEventHandlers.Any())
-                        _eventDictionaryService.FindEventHandlers();
-                    await PublishAsync(request);
-                }
-            }
-            else
+                await ((Task)desc.HandleMethod.Invoke(handler, new[] { request })!).ConfigureAwait(false);
+            });
+
+            await Task.WhenAll(tasks).ConfigureAwait(false);
+        }
+
+        public async Task StackEventDispatcherAsync()
+        {
+            var events = _eventStackDictionaryService.Drain();
+            if (events.Count == 0)
+                return;
+
+            foreach (var evt in events)
             {
-                var handlerEvents = _eventDictionaryService.GetHandlersForEvent(request.GetType());
-
-                var handlerInstances = handlerEvents
-                    .Select(t => new
-                    {
-                        Type = t,
-                        Instance = Activator.CreateInstance(t),
-                        Priority = t.GetCustomAttribute<HandlerOrderAttribute>()?.Priority ?? 0
-                    })
-                    .OrderBy(x => x.Priority) // küçük Order önce
-                    .ToList();
-
-                if (handlerEvents is not null)
+                try
                 {
-                    foreach (var handlerType in handlerInstances)
-                    {
-                        var handlerInterface = typeof(IEventHandler<>).MakeGenericType(request.GetType());
-                        await TryInvokeHandlerAsync(handlerInterface, handlerType.Instance, request);
-                    }
+                    await PublishAsync(evt).ConfigureAwait(false);
                 }
-                else
+                catch (Exception ex)
                 {
-                    _logger.LogError("No handlers found for event type");
+                    _logger.LogError(ex, $"Stack dispatch failed for {evt.GetType().Name}");
                 }
-                _isPublishRetry = false;
             }
         }
 
-        public virtual async Task StackEventDispatcherAsync()
+        private IReadOnlyList<HandlerDescriptor> GetOrBuildHandlers(Type eventType)
         {
-            var stackEvents = _eventStackDictionaryService.GetAllEventRequest();
+            return _handlerCache.GetOrAdd(eventType, BuildHandlers);
+        }
 
-            if (!_isStackPublishRetry)
-            {
-                foreach (var eventRequest in stackEvents)
-                {
-                    using var scope = _serviceProvider.CreateScope();
-                    var handlerInterface = typeof(IEventHandler<>).MakeGenericType(eventRequest.GetType());
-                    var enumerableHandlerInterface = typeof(IEnumerable<>).MakeGenericType(handlerInterface);
+        private IReadOnlyList<HandlerDescriptor> BuildHandlers(Type eventType)
+        {
+            var handlers = new List<HandlerDescriptor>();
 
-                    if (scope.ServiceProvider.GetService(enumerableHandlerInterface) is IEnumerable<object> handlers)
-                    {
-                        foreach (var handler in handlers)
-                            await TryInvokeHandlerAsync(handlerInterface, handler, eventRequest);
-                    }
-                    else
-                    {
-                        _isStackPublishRetry = true;
-                        if (!_eventDictionaryService.InternalEventHandlers.Any())
-                            _eventDictionaryService.FindEventHandlers();
-                        await StackEventDispatcherAsync().ConfigureAwait(false);
-                        return;
-                    }
-                }
-            }
-            else
+            var assemblies = _assemblies ?? AppDomain.CurrentDomain.GetAssemblies();
+
+            var handlerTypes = assemblies
+                .SelectMany(a => a.GetTypes())
+                .Where(t => !t.IsAbstract)
+                .Where(t => t.GetInterfaces().Any(i =>
+                    i.IsGenericType &&
+                    i.GetGenericTypeDefinition() == typeof(IEventHandler<>) &&
+                    i.GenericTypeArguments[0] == eventType));
+
+            foreach (var type in handlerTypes)
             {
-                foreach (var eventRequest in stackEvents)
-                {
-                    var handlerInterface = typeof(IEventHandler<>).MakeGenericType(eventRequest.GetType());
-                    var handlerTypes = _eventDictionaryService.GetHandlersForEvent(eventRequest.GetType());
-                    if (handlerTypes == null)
-                    {
-                        _logger.LogError($"No handlers found for event type {eventRequest.GetType().Name}");
-                        continue;
-                    }
-                    foreach (var handlerType in handlerTypes)
-                    {
-                        var handler = Activator.CreateInstance(handlerType);
-                        await TryInvokeHandlerAsync(handlerInterface, handler, eventRequest);
-                    }
-                }
-                _isStackPublishRetry = false;
+                var handleMethod = type.GetMethod("Handle", BindingFlags.Instance | BindingFlags.Public, binder: null, new[] { eventType }, modifiers: null);
+
+                if (handleMethod == null)
+                    continue;
+
+                var canHandleMethod = type.GetMethod("CanHandle", BindingFlags.Instance | BindingFlags.Public, binder: null, new[] { eventType }, modifiers: null);
+
+                var priority = type.GetCustomAttribute<HandlerOrderAttribute>()?.Priority ?? 0;
+
+                handlers.Add(new HandlerDescriptor(type, handleMethod, canHandleMethod, priority));
             }
-            _eventStackDictionaryService.ClearEventRequest();
+
+            return handlers.OrderBy(h => h.Priority).ToList().AsReadOnly();
         }
 
         public void AddStackRequestEvent<TEvent>(TEvent eventRequest) where TEvent : IEventRequest
             => _eventStackDictionaryService.AddEventRequest(eventRequest);
 
-        public void RemoveStackRequestEvent<TEvent>(TEvent eventRequest) where TEvent : IEventRequest
-            => _eventStackDictionaryService.RemoveEventRequest(eventRequest);
-
-        private bool TryInvokeHandler<TResponse>(Type handlerInterface, object handler, object request, out TResponse result)
-        {
-            result = default;
-
-            if (handler == null)
-            {
-                _logger.LogError("Handler instance is null.");
-                return false;
-            }
-
-            if (!handlerInterface.IsAssignableFrom(handler.GetType()))
-            {
-                _logger.LogWarning($"Handler {handler.GetType().Name} does not implement {handlerInterface.Name}.");
-                return false;
-            }
-
-            var eventType = handlerInterface.GetGenericArguments()[0];
-
-            var canHandleMethod = handlerInterface.GetMethod("CanHandle", new[] { eventType });
-            var handleMethod = handlerInterface.GetMethod("Handle", new[] { eventType });
-
-            if (handleMethod == null)
-            {
-                _logger.LogError($"Handler {handler.GetType().Name} missing required Handle method.");
-                return false;
-            }
-
-            try
-            {
-                if (canHandleMethod != null)
-                {
-                    var canHandleResult = canHandleMethod.Invoke(handler, new[] { request });
-                    if (canHandleResult is bool shouldHandle && !shouldHandle)
-                    {
-                        _logger.LogInformation(
-                            $"Handler {handler.GetType().Name} skipped because CanHandle returned false for {request.GetType().Name}.");
-                        return false;
-                    }
-                }
-
-                var taskObj = handleMethod.Invoke(handler, new[] { request });
-                if (taskObj is not Task<TResponse> typedTask)
-                {
-                    _logger.LogError($"Handler {handler.GetType().Name}.Handle did not return Task<{typeof(TResponse).Name}>.");
-                    return false;
-                }
-
-                typedTask.ConfigureAwait(false).GetAwaiter().GetResult();
-                result = typedTask.Result;
-                return true;
-            }
-            catch (TargetInvocationException tex)
-            {
-                _logger.LogError(tex.InnerException ?? tex, $"Handler {handler.GetType().Name} threw an exception.");
-                return false;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, $"Handler {handler.GetType().Name} invocation failed.");
-                return false;
-            }
-        }
-
-        private async Task TryInvokeHandlerAsync(Type handlerInterface, object handler, object request)
-        {
-            if (handler == null)
-            {
-                _logger.LogError("Handler instance is null.");
-                return;
-            }
-
-            if (!handlerInterface.IsAssignableFrom(handler.GetType()))
-            {
-                _logger.LogWarning($"Handler {handler.GetType().Name} does not implement {handlerInterface.Name}.");
-                return;
-            }
-
-            var eventType = handlerInterface.GetGenericArguments()[0];
-
-            var canHandleMethod = handlerInterface.GetMethod("CanHandle", new[] { eventType });
-            var handleMethod = handlerInterface.GetMethod("Handle", new[] { eventType });
-
-            if (handleMethod == null)
-            {
-                _logger.LogError($"Handler {handler.GetType().Name} missing required Handle method.");
-                return;
-            }
-
-            try
-            {
-                if (canHandleMethod != null)
-                {
-                    var canHandleResult = canHandleMethod.Invoke(handler, new[] { request });
-                    if (canHandleResult is bool shouldHandle && !shouldHandle)
-                    {
-                        _logger.LogInformation(
-                            $"Handler {handler.GetType().Name} skipped because CanHandle returned false for {request.GetType().Name}.");
-                        return;
-                    }
-                }
-
-                if (handleMethod.Invoke(handler, new[] { request }) is Task task)
-                {
-                    await task.ConfigureAwait(false);
-                }
-                else
-                {
-                    _logger.LogError($"Handler {handler.GetType().Name}.Handle did not return a Task.");
-                }
-            }
-            catch (TargetInvocationException ex)
-            {
-                _logger.LogError(ex.InnerException ?? ex, $"Error handling {request.GetType().Name} in {handler.GetType().Name}");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, $"Error handling {request.GetType().Name} in {handler.GetType().Name}");
-            }
-        }
+        //public void RemoveStackRequestEvent<TEvent>(TEvent eventRequest) where TEvent : IEventRequest
+        //    => _eventStackDictionaryService.RemoveEventRequest(eventRequest);
     }
 }
