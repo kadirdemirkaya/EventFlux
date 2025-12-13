@@ -1,70 +1,22 @@
-﻿using System.Reflection;
-using System.Collections.Generic;
-using System.Linq;
-using System.Xml.Linq;
-using EventFlux.Abstractions;
+﻿using EventFlux.Abstractions;
+using System.Collections.Concurrent;
 
 namespace EventFlux.Services
 {
-    public class EventStackService
+    public sealed class EventStackService
     {
-        private readonly List<IEventRequest> _internalEventHandlers;
-        private readonly object _sync = new();
+        private readonly ConcurrentQueue<IEventRequest> _queue = new();
 
-        public EventStackService()
-        {
-            _internalEventHandlers = new List<IEventRequest>();
-        }
+        public void AddEventRequest(IEventRequest request)
+            => _queue.Enqueue(request);
 
-        public List<IEventRequest> InternalEventHandlers
+        public IReadOnlyList<IEventRequest> Drain()
         {
-            get
-            {
-                lock (_sync)
-                {
-                    return _internalEventHandlers;
-                }
-            }
-        }
+            var list = new List<IEventRequest>();
+            while (_queue.TryDequeue(out var item))
+                list.Add(item);
 
-        public void ClearEventRequest()
-        {
-            lock (_sync)
-            {
-                _internalEventHandlers.Clear();
-            }
-        }
-
-        public void AddEventRequest<TEvent>(TEvent eventRequest)
-            where TEvent : IEventRequest
-        {
-            lock (_sync)
-            {
-                if (!_internalEventHandlers.Contains(eventRequest))
-                {
-                    _internalEventHandlers.Add(eventRequest);
-                }
-            }
-        }
-
-        public void RemoveEventRequest<TEvent>(TEvent eventRequest)
-           where TEvent : IEventRequest
-        {
-            lock (_sync)
-            {
-                if (_internalEventHandlers.Contains(eventRequest))
-                {
-                    _internalEventHandlers.Remove(eventRequest);
-                }
-            }
-        }
-
-        public IReadOnlyList<IEventRequest> GetAllEventRequest()
-        {
-            lock (_sync)
-            {
-                return _internalEventHandlers.AsReadOnly();
-            }
+            return list;
         }
     }
 }
