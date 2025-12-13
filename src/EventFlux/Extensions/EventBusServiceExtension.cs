@@ -36,6 +36,7 @@ namespace EventFlux.Extensions
                     var requestInjectType = typeof(IEventHandler<,>).MakeGenericType(interfaceType.GenericTypeArguments);
 
                     services.AddTransient(requestInjectType, handlerType);
+                    services.AddTransient(handlerType);
 
                     var genericArgs = interfaceType.GetGenericArguments();
                     var requestType = genericArgs[0];

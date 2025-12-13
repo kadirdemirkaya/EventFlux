@@ -12,6 +12,8 @@ namespace EventFlux
     {
         private readonly IServiceProvider _serviceProvider;
         private readonly ILogger<EventDispatcher> _logger;
+        private static readonly SemaphoreSlim _publishSemaphore = new(Environment.ProcessorCount);
+
         public EventDispatcher(IServiceProvider serviceProvider, ILogger<EventDispatcher> logger)
         {
             _serviceProvider = serviceProvider;
@@ -31,7 +33,7 @@ namespace EventFlux
                 var handler = scope.ServiceProvider.GetRequiredService(handlerType);
 
                 var behaviorType = typeof(IEventCustomPipeline<,>).MakeGenericType(requestType, typeof(TResponse));
-                var behaviors = scope.ServiceProvider.GetServices(behaviorType).Reverse().ToList(); // it could be more of pipeline
+                var behaviors = scope.ServiceProvider.GetServices(behaviorType).Reverse().ToList();
 
                 EventHandlerDelegate<TResponse> handlerDelegate = async (cancellationToken) =>
                 {
@@ -75,113 +77,108 @@ namespace EventFlux
                         return await task;
                     };
                 }
+
                 return await handlerDelegate(cancellationToken);
             }
         }
 
         public async Task PublishAsync(
-            IEventRequest request,
-            CancellationToken cancellationToken = default)
+           IEventRequest request,
+           CancellationToken cancellationToken = default)
         {
-            using (var scope = _serviceProvider.CreateScope())
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var requestType = request.GetType();
+            var handlerInterface = typeof(IEventHandler<>).MakeGenericType(requestType);
+
+            using var scope = _serviceProvider.CreateScope();
+
+            var handlerTypes = scope.ServiceProvider
+                .GetServices(handlerInterface)
+                .OrderBy(h =>
+                    h.GetType().GetCustomAttribute<HandlerOrderAttribute>()?.Priority ?? 0)
+                .ToList();
+
+            if (handlerTypes.Count == 0)
+                return;
+
+            var behaviorType = typeof(IEventCustomPipeline<>).MakeGenericType(requestType);
+
+            var behaviors = scope.ServiceProvider
+                .GetServices(behaviorType)
+                .Cast<object>()
+                .Reverse()
+                .ToList();
+
+            EventHandlerDelegate handlerDelegate = async ct =>
             {
-                var requestType = request.GetType();
+                var tasks = handlerTypes.Select(handler => InvokeHandlerInstanceWithSemaphoreAsync(handler, request, ct));
 
-                var handlerType = typeof(IEventHandler<>).MakeGenericType(requestType);
-                var handlers = scope.ServiceProvider.GetServices(handlerType).Cast<object>();
+                await Task.WhenAll(tasks).ConfigureAwait(false);
+            };
 
-                var behaviorType = typeof(IEventCustomPipeline<>).MakeGenericType(requestType);
-                var behaviors = scope.ServiceProvider.GetServices(behaviorType).Reverse().ToList(); // it could be more of pipeline
+            foreach (var behavior in behaviors)
+            {
+                var next = handlerDelegate;
+                var method = behavior.GetType().GetMethod("Handle");
 
-                EventHandlerDelegate handlerDelegate = async (cancellationToken) =>
+                handlerDelegate = async ct =>
                 {
-                    var orderedHandlers = handlers
-                        .OrderBy(h =>
-                        {
-                            var type = h.GetType();
-                            var orderAttr = type.GetCustomAttribute<HandlerOrderAttribute>();
-                            return orderAttr?.Priority ?? 0;
-                        })
-                        .ToList();
+                    var task = (Task)method!.Invoke(behavior, new object[] { request, next, ct })!;
 
-                    foreach (var handler in orderedHandlers)
-                    {
-                        var handleMethod = handler.GetType().GetMethod("Handle");
-                        var canHandleMethod = handler.GetType().GetMethod("CanHandle");
-
-                        if (handleMethod == null)
-                        {
-                            _logger.LogError($"Handler method 'Handle' not found for {requestType.Name}");
-                            continue;
-                        }
-
-                        bool canHandle = true;
-                        if (canHandleMethod != null)
-                        {
-                            var canHandleResult = canHandleMethod.Invoke(handler, new object[] { request });
-                            if (canHandleResult is bool result)
-                                canHandle = result;
-                        }
-
-                        if (!canHandle)
-                        {
-                            _logger.LogInformation(
-                                $"Handler {handler.GetType().Name} cannot handle event {requestType.Name}. Skipping.");
-                            continue;
-                        }
-
-                        try
-                        {
-                            if (handleMethod.Invoke(handler, new object[] { request }) is Task task)
-                                await task.ConfigureAwait(false);
-                            else
-                                _logger.LogError($"Handler {handler.GetType().Name}.Handle did not return a Task.");
-                        }
-                        catch (TargetInvocationException ex)
-                        {
-                            var inner = ex.InnerException ?? ex;
-                            _logger.LogError(inner, $"Error in handler {handler.GetType().Name}");
-                            throw new InvalidOperationException(
-                                $"Handler {handler.GetType().Name} failed for event {requestType.Name}", inner);
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger.LogError(ex, $"Error in handler {handler.GetType().Name}");
-                            throw new InvalidOperationException(
-                                $"Handler {handler.GetType().Name} failed for event {requestType.Name}", ex);
-                        }
-                    }
+                    await task.ConfigureAwait(false);
                 };
-
-
-                foreach (var behavior in behaviors)
-                {
-                    var next = handlerDelegate;
-                    var behaviorMethod = behavior.GetType().GetMethod("Handle");
-
-                    if (behaviorMethod == null)
-                        throw new InvalidOperationException($"Pipeline Handle method not found for {behavior.GetType().Name}");
-
-                    handlerDelegate = async (cancellationToken) =>
-                    {
-                        var task = (Task)behaviorMethod.Invoke(behavior, new object[] { request, next, cancellationToken });
-
-                        using (cancellationToken.Register(() =>
-                        {
-                            if (!task.IsCompleted)
-                            {
-                                throw new OperationCanceledException("Task has been cancelled.");
-                            }
-                        }))
-                        {
-                            await task;
-                        }
-
-                    };
-                }
-
-                await handlerDelegate(cancellationToken);
             }
+
+            await handlerDelegate(cancellationToken).ConfigureAwait(false);
+        }
+
+        private async Task InvokeHandlerInstanceWithSemaphoreAsync(
+            object handler,
+            IEventRequest request,
+            CancellationToken cancellationToken)
+        {
+            await _publishSemaphore.WaitAsync(cancellationToken);
+            try
+            {
+                await InvokeHandlerAsync(handler, request, cancellationToken);
+            }
+            finally
+            {
+                _publishSemaphore.Release();
+            }
+        }
+
+        private async Task InvokeHandlerAsync(
+            object handler,
+            IEventRequest request,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var handlerType = handler.GetType();
+            var requestType = request.GetType();
+
+            var canHandleMethod = handlerType.GetMethod("CanHandle", new[] { requestType });
+            var handleMethod = handlerType.GetMethod("Handle", new[] { requestType });
+
+            if (handleMethod == null)
+                throw new InvalidOperationException(
+                    $"Handle method not found on {handlerType.Name}");
+
+            if (canHandleMethod != null)
+            {
+                var canHandle = canHandleMethod.Invoke(handler, new object[] { request });
+
+                if (canHandle is bool b && !b)
+                    return;
+            }
+
+            if (handleMethod.Invoke(handler, new object[] { request }) is Task task)
+                await task.ConfigureAwait(false);
+            else
+                throw new InvalidOperationException(
+                    $"{handlerType.Name}.Handle must return Task");
         }
     }
 }
