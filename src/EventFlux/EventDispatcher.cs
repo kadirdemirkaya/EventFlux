@@ -4,6 +4,7 @@ using EventFlux.Delegates;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System;
+using System.Collections.Concurrent;
 using System.Reflection;
 
 namespace EventFlux
@@ -13,6 +14,7 @@ namespace EventFlux
         private readonly IServiceProvider _serviceProvider;
         private readonly ILogger<EventDispatcher> _logger;
         private static readonly SemaphoreSlim _publishSemaphore = new(Environment.ProcessorCount);
+        private readonly ConcurrentDictionary<Type, SemaphoreSlim> _eventSemaphores = new();
 
         public EventDispatcher(IServiceProvider serviceProvider, ILogger<EventDispatcher> logger)
         {
@@ -44,21 +46,24 @@ namespace EventFlux
                         throw new InvalidOperationException($"Handler method 'Handle' not found for {requestType.Name}");
 
                     bool canHandle = true;
+
                     if (canHandleMethod != null)
                     {
                         var canHandleResult = canHandleMethod.Invoke(handler, new object[] { request });
+
                         if (canHandleResult is bool result)
                             canHandle = result;
                     }
 
                     if (!canHandle)
                     {
-                        _logger.LogInformation(
-                            $"Handler {handlerType.Name} cannot handle event {requestType.Name}. Skipping.");
+                        _logger.LogInformation($"Handler {handlerType.Name} cannot handle event {requestType.Name}. Skipping.");
+
                         return default;
                     }
 
                     var task = (Task<TResponse>)handleMethod.Invoke(handler, new object[] { request })!;
+
                     return await task.ConfigureAwait(false);
                 };
 
@@ -74,6 +79,7 @@ namespace EventFlux
                     handlerDelegate = async (cancellationToken) =>
                     {
                         var task = (Task<TResponse>)behaviorMethod.Invoke(behavior, new object[] { request, next, cancellationToken })!;
+
                         return await task;
                     };
                 }
@@ -138,7 +144,11 @@ namespace EventFlux
             IEventRequest request,
             CancellationToken cancellationToken)
         {
+            var eventSemaphore = GetEventSemaphore(request.GetType());
+            await eventSemaphore.WaitAsync(cancellationToken);
+
             await _publishSemaphore.WaitAsync(cancellationToken);
+
             try
             {
                 await InvokeHandlerAsync(handler, request, cancellationToken);
@@ -146,7 +156,13 @@ namespace EventFlux
             finally
             {
                 _publishSemaphore.Release();
+                eventSemaphore.Release();
             }
+        }
+
+        private SemaphoreSlim GetEventSemaphore(Type eventType)
+        {
+            return _eventSemaphores.GetOrAdd(eventType, _ => new SemaphoreSlim(1));
         }
 
         private async Task InvokeHandlerAsync(
@@ -163,8 +179,7 @@ namespace EventFlux
             var handleMethod = handlerType.GetMethod("Handle", new[] { requestType });
 
             if (handleMethod == null)
-                throw new InvalidOperationException(
-                    $"Handle method not found on {handlerType.Name}");
+                throw new InvalidOperationException($"Handle method not found on {handlerType.Name}");
 
             if (canHandleMethod != null)
             {
@@ -177,8 +192,7 @@ namespace EventFlux
             if (handleMethod.Invoke(handler, new object[] { request }) is Task task)
                 await task.ConfigureAwait(false);
             else
-                throw new InvalidOperationException(
-                    $"{handlerType.Name}.Handle must return Task");
+                throw new InvalidOperationException($"{handlerType.Name}.Handle must return Task");
         }
     }
 }
