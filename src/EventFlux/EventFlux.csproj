@@ -7,7 +7,7 @@
 		<Nullable>enable</Nullable>
 		<GeneratePackageOnBuild>true</GeneratePackageOnBuild>
 		<PackageId>EventFlux</PackageId>
-		<Version>1.2.0</Version>
+		<Version>1.2.1</Version>
 		<Authors>Kadir Demirkaya</Authors>
 		<PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
 		<Description>A lightweight event-based CQRS implementation for .NET applications.</Description>
@@ -16,8 +16,14 @@
 		<RepositoryType>git</RepositoryType>
 		<PackageTags>CQRS EventBus EventSourcing .NET</PackageTags>
 		<PackageReleaseNotes>Initial release with event-based CQRS support.</PackageReleaseNotes>
-		<AssemblyInformationalVersion>1.1.8</AssemblyInformationalVersion>
+		<AssemblyInformationalVersion>1.2.1</AssemblyInformationalVersion>
 		<PackageReadmeFile>README.md</PackageReadmeFile>
+		<PackageReleaseNotes>
+			- Added parallel SendAsync throttling with SemaphoreSlim
+			- Improved memory allocation for PublishAsync
+			- Tested benchmarks
+			- Minor bug fixes and performance improvements
+		</PackageReleaseNotes>
 		<PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
 	</PropertyGroup>
 
