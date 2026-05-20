@@ -1,4 +1,4 @@
-﻿using EventFlux.Abstractions;
+using EventFlux.Abstractions;
 using EventFlux.Behaviors;
 using EventFlux.Services;
 using Microsoft.Extensions.DependencyInjection;
@@ -99,6 +99,9 @@ namespace EventFlux.Extensions
 
             _dictionaryService = new(assemblies, internalEventHandlers);
             _eventDictionaryMapService = new(assemblies, internalEventMaps);
+
+            services.AddSingleton<EventService>(_dictionaryService);
+            services.AddSingleton<EventMapService>(_eventDictionaryMapService);
 
             //services.AddScoped(sp => new EventBus(sp, assemblies, _dictionaryService, _eventDictionaryMapService, handlers, sp.GetRequiredService<ILogger<EventBus>>()));
 

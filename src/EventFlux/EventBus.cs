@@ -1,4 +1,4 @@
-﻿using EventFlux.Abstractions;
+using EventFlux.Abstractions;
 using EventFlux.Attributes;
 using EventFlux.Descriptors;
 using EventFlux.Services;
@@ -7,21 +7,18 @@ using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Concurrent;
 using System.Reflection;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace EventFlux
 {
     public class EventBus : IEventBus
     {
-        private bool _isSendRetry = false;
-        private bool _isPublishRetry = false;
-        private bool _isStackPublishRetry;
         private readonly ILogger<EventBus> _logger;
         private readonly IEnumerable<Type> _handlers;
         private readonly IServiceProvider _serviceProvider;
         private readonly IEnumerable<Assembly> _assemblies;
-        private readonly EventService _eventDictionaryService;
         private EventStackService _eventStackDictionaryService;
-        private readonly EventMapService _eventDictionaryMapService;
 
         private readonly ConcurrentDictionary<Type, IReadOnlyList<HandlerDescriptor>> _handlerCache = new();
 
@@ -31,8 +28,6 @@ namespace EventFlux
         {
             _logger = logger;
             _serviceProvider = serviceProvider;
-            _eventDictionaryService = new();
-            _eventDictionaryMapService = new();
             _eventStackDictionaryService = new();
         }
 
@@ -41,8 +36,6 @@ namespace EventFlux
             _logger = logger;
             _assemblies = assemblies;
             _serviceProvider = serviceProvider;
-            _eventDictionaryService = new();
-            _eventDictionaryMapService = new();
             _eventStackDictionaryService = new();
         }
 
@@ -51,8 +44,6 @@ namespace EventFlux
             _logger = logger;
             _assemblies = assemblies;
             _serviceProvider = serviceProvider;
-            _eventDictionaryService = dictionaryService;
-            _eventDictionaryMapService = eventDictionaryMapService;
             _eventStackDictionaryService = new();
         }
 
@@ -62,17 +53,18 @@ namespace EventFlux
             _handlers = handlers;
             _serviceProvider = serviceProvider;
             _assemblies = assemblies;
-            _eventDictionaryService = dictionaryService;
-            _eventDictionaryMapService = eventDictionaryMapService;
             _eventStackDictionaryService = new();
         }
 
         public async Task<TResponse?> SendAsync<TResponse>(
-            IEventRequest<TResponse> request)
+            IEventRequest<TResponse> request,
+            CancellationToken cancellationToken = default)
             where TResponse : IEventResponse
         {
             if (request is null)
                 throw new ArgumentNullException(nameof(request));
+
+            cancellationToken.ThrowIfCancellationRequested();
 
             var handlerType = typeof(IEventHandler<,>).MakeGenericType(request.GetType(), typeof(TResponse));
 
@@ -87,10 +79,14 @@ namespace EventFlux
             return await task.ConfigureAwait(false);
         }
 
-        public async Task PublishAsync(IEventRequest request)
+        public async Task PublishAsync(
+            IEventRequest request,
+            CancellationToken cancellationToken = default)
         {
             if (request is null)
                 throw new ArgumentNullException(nameof(request));
+
+            cancellationToken.ThrowIfCancellationRequested();
 
             var eventType = request.GetType();
 
@@ -107,6 +103,8 @@ namespace EventFlux
 
             var tasks = descriptors.Select(async desc =>
             {
+                cancellationToken.ThrowIfCancellationRequested();
+
                 if (!handlers.TryGetValue(desc.HandlerType, out var handler))
                     return;
 
@@ -119,7 +117,7 @@ namespace EventFlux
             await Task.WhenAll(tasks).ConfigureAwait(false);
         }
 
-        public async Task StackEventDispatcherAsync()
+        public async Task StackEventDispatcherAsync(CancellationToken cancellationToken = default)
         {
             var events = _eventStackDictionaryService.Drain();
             if (events.Count == 0)
@@ -127,9 +125,10 @@ namespace EventFlux
 
             foreach (var evt in events)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 try
                 {
-                    await PublishAsync(evt).ConfigureAwait(false);
+                    await PublishAsync(evt, cancellationToken).ConfigureAwait(false);
                 }
                 catch (Exception ex)
                 {

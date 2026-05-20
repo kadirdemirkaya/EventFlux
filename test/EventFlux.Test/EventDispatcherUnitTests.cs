@@ -1,4 +1,4 @@
-﻿using Castle.Core.Logging;
+using Castle.Core.Logging;
 using EventFlux.Abstractions;
 using EventFlux.Extensions;
 using EventFlux.Test.Events;
@@ -137,6 +137,31 @@ namespace EventFlux.Test
             Assert.Equal(1, MultiHandlerEventHandler2.HandledCount);
         }
 
+        [Fact]
+        public async Task PublishAsync_ConcurrentCalls_AreExecutedConcurrentlyAndNotBlocked()
+        {
+            // Arrange
+            var dispatcher = _serviceProvider.GetRequiredService<IEventDispatcher>();
+            ConcurrentTestEventHandler.ActiveCount = 0;
+            ConcurrentTestEventHandler.MaxConcurrentCount = 0;
+
+            var request1 = new ConcurrentTestEventRequest();
+            var request2 = new ConcurrentTestEventRequest();
+            var request3 = new ConcurrentTestEventRequest();
+
+            // Act
+            // Trigger 3 publishes concurrently
+            var task1 = dispatcher.PublishAsync(request1);
+            var task2 = dispatcher.PublishAsync(request2);
+            var task3 = dispatcher.PublishAsync(request3);
+
+            await Task.WhenAll(task1, task2, task3);
+
+            // Assert
+            // With the SemaphoreSlim(1) bottleneck removed, at least some handlers should have run concurrently
+            Assert.True(ConcurrentTestEventHandler.MaxConcurrentCount > 1, 
+                $"Expected MaxConcurrentCount to be > 1, but was {ConcurrentTestEventHandler.MaxConcurrentCount}");
+        }
 
         protected virtual void Dispose(bool disposing)
         {
@@ -150,6 +175,31 @@ namespace EventFlux.Test
         {
             Dispose(true);
             GC.SuppressFinalize(this);
+        }
+    }
+
+    public class ConcurrentTestEventRequest : IEventRequest
+    {
+    }
+
+    public class ConcurrentTestEventHandler : IEventHandler<ConcurrentTestEventRequest>
+    {
+        public static int ActiveCount = 0;
+        public static int MaxConcurrentCount = 0;
+        private static readonly object _lock = new();
+
+        public async Task Handle(ConcurrentTestEventRequest request)
+        {
+            var active = Interlocked.Increment(ref ActiveCount);
+            lock (_lock)
+            {
+                if (active > MaxConcurrentCount)
+                {
+                    MaxConcurrentCount = active;
+                }
+            }
+            await Task.Delay(100);
+            Interlocked.Decrement(ref ActiveCount);
         }
     }
 }
