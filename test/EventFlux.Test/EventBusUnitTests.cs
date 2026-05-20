@@ -1,5 +1,6 @@
-﻿using EventFlux.Abstractions;
+using EventFlux.Abstractions;
 using EventFlux.Extensions;
+using EventFlux.Services;
 using EventFlux.Test.Events;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -139,6 +140,61 @@ namespace EventFlux.Test.Unit
             // Act & Assert (Should not throw)
             await eventBus.PublishAsync(request);
         }
+
+        [Fact]
+        public void EventService_And_EventMapService_AreRegisteredInDI()
+        {
+            // Act
+            var eventService = _serviceProvider.GetService<EventService>();
+            var eventMapService = _serviceProvider.GetService<EventMapService>();
+
+            // Assert
+            Assert.NotNull(eventService);
+            Assert.NotNull(eventMapService);
+        }
+
+        [Fact]
+        public async Task SendAsync_WithCancellationToken_ThrowsOperationCanceledException()
+        {
+            // Arrange
+            var eventBus = _serviceProvider.GetRequiredService<IEventBus>();
+            var request = new ExampleEventRequest { Num = 123 };
+            using var cts = new CancellationTokenSource();
+            cts.Cancel();
+
+            // Act & Assert
+            await Assert.ThrowsAsync<OperationCanceledException>(() =>
+                eventBus.SendAsync<ExampleEventResponse>(request, cts.Token));
+        }
+
+        [Fact]
+        public async Task PublishAsync_WithCancellationToken_ThrowsOperationCanceledException()
+        {
+            // Arrange
+            var eventBus = _serviceProvider.GetRequiredService<IEventBus>();
+            var request = new PublishEventRequest { Data = "test" };
+            using var cts = new CancellationTokenSource();
+            cts.Cancel();
+
+            // Act & Assert
+            await Assert.ThrowsAsync<OperationCanceledException>(() =>
+                eventBus.PublishAsync(request, cts.Token));
+        }
+
+        [Fact]
+        public async Task StackEventDispatcherAsync_WithCancellationToken_ThrowsOperationCanceledException()
+        {
+            // Arrange
+            var eventBus = _serviceProvider.GetRequiredService<IEventBus>();
+            eventBus.AddStackRequestEvent(new PublishEventRequest { Data = "stack-test" });
+            using var cts = new CancellationTokenSource();
+            cts.Cancel();
+
+            // Act & Assert
+            await Assert.ThrowsAsync<OperationCanceledException>(() =>
+                eventBus.StackEventDispatcherAsync(cts.Token));
+        }
+
         protected virtual void Dispose(bool disposing)
         {
             if (disposing)

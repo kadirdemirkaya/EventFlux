@@ -1,4 +1,4 @@
-﻿using EventFlux.Abstractions;
+using EventFlux.Abstractions;
 using EventFlux.Attributes;
 using EventFlux.Delegates;
 using Microsoft.Extensions.DependencyInjection;
@@ -14,7 +14,6 @@ namespace EventFlux
         private readonly IServiceProvider _serviceProvider;
         private readonly ILogger<EventDispatcher> _logger;
         private static readonly SemaphoreSlim _publishSemaphore = new(Environment.ProcessorCount);
-        private readonly ConcurrentDictionary<Type, SemaphoreSlim> _eventSemaphores = new();
 
         public EventDispatcher(IServiceProvider serviceProvider, ILogger<EventDispatcher> logger)
         {
@@ -144,9 +143,6 @@ namespace EventFlux
             IEventRequest request,
             CancellationToken cancellationToken)
         {
-            var eventSemaphore = GetEventSemaphore(request.GetType());
-            await eventSemaphore.WaitAsync(cancellationToken);
-
             await _publishSemaphore.WaitAsync(cancellationToken);
 
             try
@@ -156,13 +152,7 @@ namespace EventFlux
             finally
             {
                 _publishSemaphore.Release();
-                eventSemaphore.Release();
             }
-        }
-
-        private SemaphoreSlim GetEventSemaphore(Type eventType)
-        {
-            return _eventSemaphores.GetOrAdd(eventType, _ => new SemaphoreSlim(1));
         }
 
         private async Task InvokeHandlerAsync(
