@@ -1,12 +1,9 @@
-using EventFlux.Abstractions;
-using EventFlux.Attributes;
-using EventFlux.Descriptors;
+﻿using EventFlux.Abstractions;
 using EventFlux.Internal;
 using EventFlux.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System;
-using System.Collections.Concurrent;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
@@ -18,8 +15,6 @@ namespace EventFlux
         private readonly ILogger<EventBus>? _logger;
         private readonly IServiceProvider? _serviceProvider;
         private readonly EventStackService _eventStackDictionaryService = new();
-
-        private readonly ConcurrentDictionary<(Type HandlerType, Type EventType), HandlerDescriptor?> _handlerCache = new();
 
         public EventBus() { }
 
@@ -56,15 +51,13 @@ namespace EventFlux
 
             var serviceProvider = RequireServiceProvider();
 
-            var handlerType = typeof(IEventHandler<,>).MakeGenericType(request.GetType(), typeof(TResponse));
+            var handlerType = DispatchTypeCache.RequestHandlerType(request.GetType(), typeof(TResponse));
 
             using var scope = serviceProvider.CreateScope();
 
             var handler = scope.ServiceProvider.GetRequiredService(handlerType);
 
-            var method = handlerType.GetMethod("Handle")!;
-
-            var task = (Task<TResponse>)MethodInvocation.InvokePreservingException(method, handler, new object?[] { request })!;
+            var task = (Task<TResponse>)DispatchTypeCache.ForInterface(handlerType).Handle(handler, request);
 
             return await task.ConfigureAwait(false);
         }
@@ -84,15 +77,15 @@ namespace EventFlux
 
             using var scope = serviceProvider.CreateScope();
 
-            var handlerType = typeof(IEventHandler<>).MakeGenericType(eventType);
+            var handlerType = DispatchTypeCache.NotificationHandlerType(eventType);
 
             var handlers = scope.ServiceProvider.GetServices(handlerType);
 
             var invocations = handlers
                 .Where(handler => handler is not null)
-                .Select(handler => (Handler: handler!, Descriptor: GetOrAddDescriptor(handler!.GetType(), eventType)))
-                .Where(entry => entry.Descriptor is not null)
-                .OrderBy(entry => entry.Descriptor!.Priority)
+                .Select(handler => (Handler: handler!, Accessor: HandlerAccessor.ForConcreteType(handler!.GetType(), eventType)))
+                .Where(entry => entry.Accessor is not null)
+                .OrderBy(entry => entry.Accessor!.Priority)
                 .ToList();
 
             if (invocations.Count == 0)
@@ -102,12 +95,12 @@ namespace EventFlux
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                var descriptor = entry.Descriptor!;
+                var accessor = entry.Accessor!;
 
-                if (descriptor.CanHandleMethod != null && MethodInvocation.InvokePreservingException(descriptor.CanHandleMethod, entry.Handler, new object?[] { request }) is false)
+                if (accessor.CanHandle != null && !accessor.CanHandle(entry.Handler, request))
                     return;
 
-                await ((Task)MethodInvocation.InvokePreservingException(descriptor.HandleMethod, entry.Handler, new object?[] { request })!).ConfigureAwait(false);
+                await ((Task)accessor.Handle(entry.Handler, request)).ConfigureAwait(false);
             });
 
             await Task.WhenAll(tasks).ConfigureAwait(false);
@@ -139,25 +132,6 @@ namespace EventFlux
         {
             return _serviceProvider ?? throw new InvalidOperationException(
                 $"{nameof(EventBus)} was created without a service provider. Resolve {nameof(IEventBus)} from the dependency injection container after calling AddEventBus(), instead of constructing it directly.");
-        }
-
-        private HandlerDescriptor? GetOrAddDescriptor(Type handlerType, Type eventType)
-        {
-            return _handlerCache.GetOrAdd((handlerType, eventType), key => BuildDescriptor(key.HandlerType, key.EventType));
-        }
-
-        private static HandlerDescriptor? BuildDescriptor(Type handlerType, Type eventType)
-        {
-            var handleMethod = handlerType.GetMethod("Handle", BindingFlags.Instance | BindingFlags.Public, binder: null, new[] { eventType }, modifiers: null);
-
-            if (handleMethod == null)
-                return null;
-
-            var canHandleMethod = handlerType.GetMethod("CanHandle", BindingFlags.Instance | BindingFlags.Public, binder: null, new[] { eventType }, modifiers: null);
-
-            var priority = handlerType.GetCustomAttribute<HandlerOrderAttribute>()?.Priority ?? 0;
-
-            return new HandlerDescriptor(handlerType, handleMethod, canHandleMethod, priority);
         }
 
         public void AddStackRequestEvent<TEvent>(TEvent eventRequest) where TEvent : IEventRequest
