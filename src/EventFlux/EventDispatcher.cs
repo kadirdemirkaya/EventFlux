@@ -30,57 +30,34 @@ namespace EventFlux
             {
                 var requestType = request.GetType();
 
-                var handlerType = typeof(IEventHandler<,>).MakeGenericType(requestType, typeof(TResponse));
+                var handlerType = DispatchTypeCache.RequestHandlerType(requestType, typeof(TResponse));
                 var handler = scope.ServiceProvider.GetRequiredService(handlerType);
 
-                var behaviorType = typeof(IEventCustomPipeline<,>).MakeGenericType(requestType, typeof(TResponse));
+                var behaviorType = DispatchTypeCache.RequestPipelineType(requestType, typeof(TResponse));
                 var behaviors = scope.ServiceProvider.GetServices(behaviorType).Reverse().ToList();
 
-                EventHandlerDelegate<TResponse> handlerDelegate = async (cancellationToken) =>
+                var accessor = DispatchTypeCache.ForInterface(handlerType);
+
+                EventHandlerDelegate<TResponse> handlerDelegate = (cancellationToken) =>
                 {
-                    var handleMethod = handlerType.GetMethod("Handle");
-                    var canHandleMethod = handlerType.GetMethod("CanHandle");
-
-                    if (handleMethod == null)
-                        throw new InvalidOperationException($"Handler method 'Handle' not found for {requestType.Name}");
-
-                    bool canHandle = true;
-
-                    if (canHandleMethod != null)
+                    if (accessor.CanHandle != null && accessor.CanHandle(handler, request) is bool result && !result)
                     {
-                        var canHandleResult = MethodInvocation.InvokePreservingException(canHandleMethod, handler, new object?[] { request });
+                        _logger.LogInformation("Handler {Handler} cannot handle event {EventName}. Skipping.", handlerType.Name, requestType.Name);
 
-                        if (canHandleResult is bool result)
-                            canHandle = result;
+                        return Task.FromResult<TResponse>(default!);
                     }
 
-                    if (!canHandle)
-                    {
-                        _logger.LogInformation($"Handler {handlerType.Name} cannot handle event {requestType.Name}. Skipping.");
-
-                        return default;
-                    }
-
-                    var task = (Task<TResponse>)MethodInvocation.InvokePreservingException(handleMethod, handler, new object?[] { request })!;
-
-                    return await task.ConfigureAwait(false);
+                    return (Task<TResponse>)accessor.Handle(handler, request);
                 };
 
 
                 foreach (var behavior in behaviors)
                 {
                     var next = handlerDelegate;
-                    var behaviorMethod = behavior.GetType().GetMethod("Handle");
+                    var behaviorInvoker = DispatchTypeCache.BehaviorInvoker(behavior!.GetType());
 
-                    if (behaviorMethod == null)
-                        throw new InvalidOperationException($"Pipeline Handle method not found for {behavior.GetType().Name}");
-
-                    handlerDelegate = async (cancellationToken) =>
-                    {
-                        var task = (Task<TResponse>)MethodInvocation.InvokePreservingException(behaviorMethod, behavior, new object?[] { request, next, cancellationToken })!;
-
-                        return await task;
-                    };
+                    handlerDelegate = (cancellationToken) =>
+                        (Task<TResponse>)behaviorInvoker(behavior, request, next, cancellationToken);
                 }
 
                 return await handlerDelegate(cancellationToken);
@@ -94,7 +71,7 @@ namespace EventFlux
             cancellationToken.ThrowIfCancellationRequested();
 
             var requestType = request.GetType();
-            var handlerInterface = typeof(IEventHandler<>).MakeGenericType(requestType);
+            var handlerInterface = DispatchTypeCache.NotificationHandlerType(requestType);
 
             using var scope = _serviceProvider.CreateScope();
 
@@ -107,7 +84,7 @@ namespace EventFlux
             if (handlerTypes.Count == 0)
                 return;
 
-            var behaviorType = typeof(IEventCustomPipeline<>).MakeGenericType(requestType);
+            var behaviorType = DispatchTypeCache.NotificationPipelineType(requestType);
 
             var behaviors = scope.ServiceProvider
                 .GetServices(behaviorType)
@@ -125,14 +102,9 @@ namespace EventFlux
             foreach (var behavior in behaviors)
             {
                 var next = handlerDelegate;
-                var method = behavior.GetType().GetMethod("Handle");
+                var behaviorInvoker = DispatchTypeCache.BehaviorInvoker(behavior.GetType());
 
-                handlerDelegate = async ct =>
-                {
-                    var task = (Task)MethodInvocation.InvokePreservingException(method!, behavior, new object?[] { request, next, ct })!;
-
-                    await task.ConfigureAwait(false);
-                };
+                handlerDelegate = ct => (Task)behaviorInvoker(behavior, request, next, ct);
             }
 
             await handlerDelegate(cancellationToken).ConfigureAwait(false);
@@ -148,21 +120,13 @@ namespace EventFlux
             var handlerType = handler.GetType();
             var requestType = request.GetType();
 
-            var canHandleMethod = handlerType.GetMethod("CanHandle", new[] { requestType });
-            var handleMethod = handlerType.GetMethod("Handle", new[] { requestType });
+            var accessor = HandlerAccessor.ForConcreteType(handlerType, requestType)
+                ?? throw new InvalidOperationException($"Handle method not found on {handlerType.Name}");
 
-            if (handleMethod == null)
-                throw new InvalidOperationException($"Handle method not found on {handlerType.Name}");
+            if (accessor.CanHandle != null && !accessor.CanHandle(handler, request))
+                return;
 
-            if (canHandleMethod != null)
-            {
-                var canHandle = MethodInvocation.InvokePreservingException(canHandleMethod, handler, new object?[] { request });
-
-                if (canHandle is bool b && !b)
-                    return;
-            }
-
-            if (MethodInvocation.InvokePreservingException(handleMethod, handler, new object?[] { request }) is Task task)
+            if (accessor.Handle(handler, request) is Task task)
                 await task.ConfigureAwait(false);
             else
                 throw new InvalidOperationException($"{handlerType.Name}.Handle must return Task");
