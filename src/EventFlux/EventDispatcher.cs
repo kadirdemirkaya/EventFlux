@@ -13,7 +13,6 @@ namespace EventFlux
     {
         private readonly IServiceProvider _serviceProvider;
         private readonly ILogger<EventDispatcher> _logger;
-        private static readonly SemaphoreSlim _publishSemaphore = new(Environment.ProcessorCount);
 
         public EventDispatcher(IServiceProvider serviceProvider, ILogger<EventDispatcher> logger)
         {
@@ -117,7 +116,7 @@ namespace EventFlux
 
             EventHandlerDelegate handlerDelegate = async ct =>
             {
-                var tasks = handlerTypes.Select(handler => InvokeHandlerInstanceWithSemaphoreAsync(handler, request, ct));
+                var tasks = handlerTypes.Select(handler => InvokeHandlerAsync(handler, request, ct));
 
                 await Task.WhenAll(tasks).ConfigureAwait(false);
             };
@@ -136,23 +135,6 @@ namespace EventFlux
             }
 
             await handlerDelegate(cancellationToken).ConfigureAwait(false);
-        }
-
-        private async Task InvokeHandlerInstanceWithSemaphoreAsync(
-            object handler,
-            IEventRequest request,
-            CancellationToken cancellationToken)
-        {
-            await _publishSemaphore.WaitAsync(cancellationToken);
-
-            try
-            {
-                await InvokeHandlerAsync(handler, request, cancellationToken);
-            }
-            finally
-            {
-                _publishSemaphore.Release();
-            }
         }
 
         private async Task InvokeHandlerAsync(
