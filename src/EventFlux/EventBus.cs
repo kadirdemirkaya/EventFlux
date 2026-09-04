@@ -175,8 +175,5 @@ namespace EventFlux
 
         public void AddStackRequestEvent<TEvent>(TEvent eventRequest) where TEvent : IEventRequest
             => _eventStackDictionaryService.AddEventRequest(eventRequest);
-
-        //public void RemoveStackRequestEvent<TEvent>(TEvent eventRequest) where TEvent : IEventRequest
-        //    => _eventStackDictionaryService.RemoveEventRequest(eventRequest);
     }
 }
