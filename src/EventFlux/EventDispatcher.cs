@@ -1,6 +1,7 @@
-using EventFlux.Abstractions;
+﻿using EventFlux.Abstractions;
 using EventFlux.Attributes;
 using EventFlux.Delegates;
+using EventFlux.Internal;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System;
@@ -47,7 +48,7 @@ namespace EventFlux
 
                     if (canHandleMethod != null)
                     {
-                        var canHandleResult = canHandleMethod.Invoke(handler, new object[] { request });
+                        var canHandleResult = MethodInvocation.InvokePreservingException(canHandleMethod, handler, new object?[] { request });
 
                         if (canHandleResult is bool result)
                             canHandle = result;
@@ -60,7 +61,7 @@ namespace EventFlux
                         return default;
                     }
 
-                    var task = (Task<TResponse>)handleMethod.Invoke(handler, new object[] { request })!;
+                    var task = (Task<TResponse>)MethodInvocation.InvokePreservingException(handleMethod, handler, new object?[] { request })!;
 
                     return await task.ConfigureAwait(false);
                 };
@@ -76,7 +77,7 @@ namespace EventFlux
 
                     handlerDelegate = async (cancellationToken) =>
                     {
-                        var task = (Task<TResponse>)behaviorMethod.Invoke(behavior, new object[] { request, next, cancellationToken })!;
+                        var task = (Task<TResponse>)MethodInvocation.InvokePreservingException(behaviorMethod, behavior, new object?[] { request, next, cancellationToken })!;
 
                         return await task;
                     };
@@ -128,7 +129,7 @@ namespace EventFlux
 
                 handlerDelegate = async ct =>
                 {
-                    var task = (Task)method!.Invoke(behavior, new object[] { request, next, ct })!;
+                    var task = (Task)MethodInvocation.InvokePreservingException(method!, behavior, new object?[] { request, next, ct })!;
 
                     await task.ConfigureAwait(false);
                 };
@@ -155,13 +156,13 @@ namespace EventFlux
 
             if (canHandleMethod != null)
             {
-                var canHandle = canHandleMethod.Invoke(handler, new object[] { request });
+                var canHandle = MethodInvocation.InvokePreservingException(canHandleMethod, handler, new object?[] { request });
 
                 if (canHandle is bool b && !b)
                     return;
             }
 
-            if (handleMethod.Invoke(handler, new object[] { request }) is Task task)
+            if (MethodInvocation.InvokePreservingException(handleMethod, handler, new object?[] { request }) is Task task)
                 await task.ConfigureAwait(false);
             else
                 throw new InvalidOperationException($"{handlerType.Name}.Handle must return Task");
