@@ -15,12 +15,10 @@ namespace EventFlux
     public class EventBus : IEventBus
     {
         private readonly ILogger<EventBus> _logger;
-        private readonly IEnumerable<Type> _handlers;
         private readonly IServiceProvider _serviceProvider;
-        private readonly IEnumerable<Assembly> _assemblies;
         private EventStackService _eventStackDictionaryService;
 
-        private readonly ConcurrentDictionary<Type, IReadOnlyList<HandlerDescriptor>> _handlerCache = new();
+        private readonly ConcurrentDictionary<(Type HandlerType, Type EventType), HandlerDescriptor?> _handlerCache = new();
 
         public EventBus() { }
 
@@ -32,28 +30,18 @@ namespace EventFlux
         }
 
         public EventBus(IServiceProvider serviceProvider, IEnumerable<Assembly> assemblies, ILogger<EventBus> logger)
+            : this(serviceProvider, logger)
         {
-            _logger = logger;
-            _assemblies = assemblies;
-            _serviceProvider = serviceProvider;
-            _eventStackDictionaryService = new();
         }
 
         public EventBus(IServiceProvider serviceProvider, IEnumerable<Assembly> assemblies, EventService dictionaryService, EventMapService eventDictionaryMapService, ILogger<EventBus> logger)
+            : this(serviceProvider, logger)
         {
-            _logger = logger;
-            _assemblies = assemblies;
-            _serviceProvider = serviceProvider;
-            _eventStackDictionaryService = new();
         }
 
         public EventBus(IServiceProvider serviceProvider, IEnumerable<Assembly> assemblies, EventService dictionaryService, EventMapService eventDictionaryMapService, IEnumerable<Type> handlers, ILogger<EventBus> logger)
+            : this(serviceProvider, logger)
         {
-            _logger = logger;
-            _handlers = handlers;
-            _serviceProvider = serviceProvider;
-            _assemblies = assemblies;
-            _eventStackDictionaryService = new();
         }
 
         public async Task<TResponse?> SendAsync<TResponse>(
@@ -90,28 +78,32 @@ namespace EventFlux
 
             var eventType = request.GetType();
 
-            var descriptors = GetOrBuildHandlers(eventType);
-
-            if (descriptors.Count == 0)
-                return;
-
             using var scope = _serviceProvider.CreateScope();
 
             var handlerType = typeof(IEventHandler<>).MakeGenericType(eventType);
 
-            var handlers = scope.ServiceProvider.GetServices(handlerType).ToDictionary(h => h.GetType());
+            var handlers = scope.ServiceProvider.GetServices(handlerType);
 
-            var tasks = descriptors.Select(async desc =>
+            var invocations = handlers
+                .Where(handler => handler is not null)
+                .Select(handler => (Handler: handler!, Descriptor: GetOrAddDescriptor(handler!.GetType(), eventType)))
+                .Where(entry => entry.Descriptor is not null)
+                .OrderBy(entry => entry.Descriptor!.Priority)
+                .ToList();
+
+            if (invocations.Count == 0)
+                return;
+
+            var tasks = invocations.Select(async entry =>
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                if (!handlers.TryGetValue(desc.HandlerType, out var handler))
+                var descriptor = entry.Descriptor!;
+
+                if (descriptor.CanHandleMethod != null && descriptor.CanHandleMethod.Invoke(entry.Handler, new[] { request }) is false)
                     return;
 
-                if (desc.CanHandleMethod != null && desc.CanHandleMethod.Invoke(handler, new[] { request }) is false)
-                    return;
-
-                await ((Task)desc.HandleMethod.Invoke(handler, new[] { request })!).ConfigureAwait(false);
+                await ((Task)descriptor.HandleMethod.Invoke(entry.Handler, new[] { request })!).ConfigureAwait(false);
             });
 
             await Task.WhenAll(tasks).ConfigureAwait(false);
@@ -137,40 +129,23 @@ namespace EventFlux
             }
         }
 
-        private IReadOnlyList<HandlerDescriptor> GetOrBuildHandlers(Type eventType)
+        private HandlerDescriptor? GetOrAddDescriptor(Type handlerType, Type eventType)
         {
-            return _handlerCache.GetOrAdd(eventType, BuildHandlers);
+            return _handlerCache.GetOrAdd((handlerType, eventType), key => BuildDescriptor(key.HandlerType, key.EventType));
         }
 
-        private IReadOnlyList<HandlerDescriptor> BuildHandlers(Type eventType)
+        private static HandlerDescriptor? BuildDescriptor(Type handlerType, Type eventType)
         {
-            var handlers = new List<HandlerDescriptor>();
+            var handleMethod = handlerType.GetMethod("Handle", BindingFlags.Instance | BindingFlags.Public, binder: null, new[] { eventType }, modifiers: null);
 
-            var assemblies = _assemblies ?? AppDomain.CurrentDomain.GetAssemblies();
+            if (handleMethod == null)
+                return null;
 
-            var handlerTypes = assemblies
-                .SelectMany(a => a.GetTypes())
-                .Where(t => !t.IsAbstract)
-                .Where(t => t.GetInterfaces().Any(i =>
-                    i.IsGenericType &&
-                    i.GetGenericTypeDefinition() == typeof(IEventHandler<>) &&
-                    i.GenericTypeArguments[0] == eventType));
+            var canHandleMethod = handlerType.GetMethod("CanHandle", BindingFlags.Instance | BindingFlags.Public, binder: null, new[] { eventType }, modifiers: null);
 
-            foreach (var type in handlerTypes)
-            {
-                var handleMethod = type.GetMethod("Handle", BindingFlags.Instance | BindingFlags.Public, binder: null, new[] { eventType }, modifiers: null);
+            var priority = handlerType.GetCustomAttribute<HandlerOrderAttribute>()?.Priority ?? 0;
 
-                if (handleMethod == null)
-                    continue;
-
-                var canHandleMethod = type.GetMethod("CanHandle", BindingFlags.Instance | BindingFlags.Public, binder: null, new[] { eventType }, modifiers: null);
-
-                var priority = type.GetCustomAttribute<HandlerOrderAttribute>()?.Priority ?? 0;
-
-                handlers.Add(new HandlerDescriptor(type, handleMethod, canHandleMethod, priority));
-            }
-
-            return handlers.OrderBy(h => h.Priority).ToList().AsReadOnly();
+            return new HandlerDescriptor(handlerType, handleMethod, canHandleMethod, priority);
         }
 
         public void AddStackRequestEvent<TEvent>(TEvent eventRequest) where TEvent : IEventRequest
