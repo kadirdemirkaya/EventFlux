@@ -12,13 +12,29 @@ namespace EventFlux.Extensions
     {
         public static IServiceCollection AddEventBus(this IServiceCollection services, params Assembly[] assemblies)
         {
+            if (services is null)
+            {
+                throw new ArgumentNullException(nameof(services));
+            }
+
+            if (assemblies is null || assemblies.Length == 0)
+            {
+                throw new ArgumentException("At least one assembly must be provided.", nameof(assemblies));
+            }
+
+            var validAssemblies = assemblies.Where(a => a is not null).ToArray();
+            if (validAssemblies.Length == 0)
+            {
+                throw new ArgumentException("At least one valid assembly must be provided.", nameof(assemblies));
+            }
+
             List<Type> handlers = new();
             Dictionary<Type, List<Type>> internalEventHandlers = new();
             Dictionary<Type, Type> internalEventMaps = new();
             EventService _dictionaryService;
             EventMapService _eventDictionaryMapService;
 
-            var handlerTypesWithResponse = assemblies
+            var handlerTypesWithResponse = validAssemblies
                 .SelectMany(a => a.GetTypes())
                 .Where(t => !t.IsInterface && !t.IsAbstract)
                 .Where(t => t.GetInterfaces().Any(i =>
@@ -62,7 +78,7 @@ namespace EventFlux.Extensions
                 }
             }
 
-            var handlerTypes = assemblies
+            var handlerTypes = validAssemblies
                 .SelectMany(a => a.GetTypes())
                 .Where(t => !t.IsInterface && !t.IsAbstract)
                 .Where(t => t.GetInterfaces().Any(i =>
@@ -97,8 +113,8 @@ namespace EventFlux.Extensions
                 }
             }
 
-            _dictionaryService = new(assemblies, internalEventHandlers);
-            _eventDictionaryMapService = new(assemblies, internalEventMaps);
+            _dictionaryService = new(validAssemblies, internalEventHandlers);
+            _eventDictionaryMapService = new(validAssemblies, internalEventMaps);
 
             services.AddSingleton<EventService>(_dictionaryService);
             services.AddSingleton<EventMapService>(_eventDictionaryMapService);
@@ -106,7 +122,7 @@ namespace EventFlux.Extensions
             services.AddScoped<IEventBus>(sp =>
                 new EventBus(
                     sp,
-                    assemblies,
+                    validAssemblies,
                     _dictionaryService,
                     _eventDictionaryMapService,
                     handlers,
@@ -119,25 +135,38 @@ namespace EventFlux.Extensions
 
         public static IServiceCollection AddEventDispatcher(this IServiceCollection services)
         {
-            services.AddTransient<IEventDispatcher, EventDispatcher>();
+            if (services is null)
+            {
+                throw new ArgumentNullException(nameof(services));
+            }
+
+            services.TryAddTransient<IEventDispatcher, EventDispatcher>();
 
             return services;
         }
 
         public static IServiceCollection AddEventLogging(this IServiceCollection services)
         {
-            services.AddTransient(typeof(IEventCustomPipeline<>), typeof(LoggingBehavior<>));
-            
-            services.AddTransient(typeof(IEventCustomPipeline<,>), typeof(LoggingBehavior<,>));
+            if (services is null)
+            {
+                throw new ArgumentNullException(nameof(services));
+            }
+
+            services.TryAddEnumerable(ServiceDescriptor.Transient(typeof(IEventCustomPipeline<>), typeof(LoggingBehavior<>)));
+            services.TryAddEnumerable(ServiceDescriptor.Transient(typeof(IEventCustomPipeline<,>), typeof(LoggingBehavior<,>)));
 
             return services;
         }
 
         public static IServiceCollection AddEventTimeout(this IServiceCollection services)
         {
-            services.AddTransient(typeof(IEventCustomPipeline<>), typeof(TimeoutBehavior<>));
+            if (services is null)
+            {
+                throw new ArgumentNullException(nameof(services));
+            }
 
-            services.AddTransient(typeof(IEventCustomPipeline<,>), typeof(TimeoutBehavior<,>));
+            services.TryAddEnumerable(ServiceDescriptor.Transient(typeof(IEventCustomPipeline<>), typeof(TimeoutBehavior<>)));
+            services.TryAddEnumerable(ServiceDescriptor.Transient(typeof(IEventCustomPipeline<,>), typeof(TimeoutBehavior<,>)));
 
             return services;
         }

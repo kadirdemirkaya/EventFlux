@@ -1,4 +1,4 @@
-﻿using EventFlux.Abstractions;
+using EventFlux.Abstractions;
 using EventFlux.Delegates;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
@@ -31,7 +31,7 @@ namespace EventFlux.Behaviors
 
             try
             {
-                await next(cancellationToken);
+                await next(cancellationToken).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
@@ -82,7 +82,7 @@ namespace EventFlux.Behaviors
 
             try
             {
-                response = await next(cancellationToken);
+                response = await next(cancellationToken).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
