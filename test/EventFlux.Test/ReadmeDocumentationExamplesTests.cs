@@ -207,5 +207,24 @@ namespace EventFlux.Test
             var options = sp.GetRequiredService<EventFluxOptions>();
             Assert.False(options.CreateScopePerEvent);
         }
+
+        [Fact]
+        public void Readme_PublishStrategyConfiguration_AllowsSequential()
+        {
+            var services = new ServiceCollection();
+            services.AddLogging();
+            services.AddEventBus(options =>
+            {
+                options.PublishStrategy = PublishStrategy.Sequential;
+            }, typeof(ReadmeDocumentationExamplesTests).Assembly);
+            services.AddEventDispatcher(options =>
+            {
+                options.PublishStrategy = PublishStrategy.Sequential;
+            });
+
+            using var sp = services.BuildServiceProvider();
+            var options = sp.GetRequiredService<EventFluxOptions>();
+            Assert.Equal(PublishStrategy.Sequential, options.PublishStrategy);
+        }
     }
 }

@@ -117,14 +117,14 @@ EventFlux provides two dispatch interfaces to fit your performance and architect
 |---|---|---|
 | **Primary Focus** | Direct, high-throughput, low-latency dispatch | Extensible pipeline dispatch |
 | **Pipeline Behaviors (`IEventCustomPipeline`)** | ❌ Bypassed (direct invocation) | ✅ Supported (wraps handlers in pipeline) |
-| **`[HandlerOrder]` Support** | ❌ Standard registration order | ✅ Supported (lower order started first) |
+| **`[HandlerOrder]` Support** | ✅ Supported (order-based invocation) | ✅ Supported (order-based invocation) |
 | **Dispatch Overhead** | Minimal (~81 ns) | Low (includes pipeline middleware) |
 | **Publish / Subscribe (`PublishAsync`)** | ✅ Supported | ✅ Supported |
 | **Batch / Stack Dispatch (`AddStackRequestEvent`)** | ✅ Supported | ❌ |
 
 > **When to use which?**
 > - Use **`IEventBus`** when you want fast, direct execution without pipeline middleware overhead.
-> - Use **`IEventDispatcher`** when you need cross-cutting behaviors (validation, logging, caching, metrics) or explicit handler ordering.
+> - Use **`IEventDispatcher`** when you need cross-cutting behaviors (validation, logging, caching, metrics).
 
 ---
 
@@ -159,8 +159,8 @@ builder.Services.AddTransient(typeof(IEventCustomPipeline<,>), typeof(Validation
 ```
 
 ### 2. Multi-Handler Ordering with `[HandlerOrder]`
-
-When broadcasting notifications via `PublishAsync`, control the start sequence of multiple handlers using `[HandlerOrder(priority)]` (lower values execute first):
+ 
+When broadcasting notifications via `PublishAsync`, control the invocation sequence of multiple handlers using `[HandlerOrder(priority)]`:
 
 ```csharp
 public record UserCreatedNotification(Guid UserId) : IEventRequest;
@@ -170,7 +170,7 @@ public class AuditLogHandler : IEventHandler<UserCreatedNotification>
 {
     public Task Handle(UserCreatedNotification notification)
     {
-        // Executes first
+        // Invoked first
         return Task.CompletedTask;
     }
 }
@@ -180,11 +180,14 @@ public class SendWelcomeEmailHandler : IEventHandler<UserCreatedNotification>
 {
     public Task Handle(UserCreatedNotification notification)
     {
-        // Executes second
+        // Invoked second
         return Task.CompletedTask;
     }
 }
 ```
+
+> **Parallel vs. Sequential:**
+> By default, multiple handlers start in order but execute concurrently (`PublishStrategy.Parallel`). If you need each handler to fully complete before the next handler starts, configure `options.PublishStrategy = PublishStrategy.Sequential` (see below).
 
 ### 3. Conditional Handling (`CanHandle`)
 
@@ -230,21 +233,26 @@ public class OrderService
 }
 ```
 
-### 5. Dependency Injection Scope Configuration (`EventFluxOptions`)
+### 5. Advanced Configuration (`EventFluxOptions`)
 
-By default, EventFlux creates an isolated child dependency injection scope for every dispatched event (`CreateScopePerEvent = true`). If your handlers need to share the exact same ambient scope as the caller (for instance, sharing an EF Core `DbContext` transaction, Unit of Work, or current user context), you can configure this via `EventFluxOptions`:
+Customize execution behavior globally during registration:
 
 ```csharp
-// Configure on EventBus
 builder.Services.AddEventBus(options =>
 {
-    options.CreateScopePerEvent = false; // Handlers share the caller's DI scope
+    // Ambient Scope: Handlers share the caller's DI scope (e.g. DbContext / Unit of Work)
+    // Default is true (each event runs in an isolated child scope)
+    options.CreateScopePerEvent = false;
+
+    // Execution Strategy: Sequential (await each handler in order) or Parallel (Task.WhenAll)
+    // Default is PublishStrategy.Parallel
+    options.PublishStrategy = PublishStrategy.Sequential;
 }, typeof(Program).Assembly);
 
-// Configure on EventDispatcher
 builder.Services.AddEventDispatcher(options =>
 {
     options.CreateScopePerEvent = false;
+    options.PublishStrategy = PublishStrategy.Sequential;
 });
 ```
 

@@ -164,7 +164,7 @@ namespace EventFlux
             }
         }
 
-        private static async Task DispatchPublishAsync(
+        private async Task DispatchPublishAsync(
             IServiceProvider serviceProvider,
             IEventRequest request,
             CancellationToken cancellationToken)
@@ -185,19 +185,36 @@ namespace EventFlux
             if (invocations.Count == 0)
                 return;
 
-            var tasks = invocations.Select(async entry =>
+            if (_options.PublishStrategy == PublishStrategy.Sequential)
             {
-                cancellationToken.ThrowIfCancellationRequested();
+                foreach (var entry in invocations)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
 
-                var accessor = entry.Accessor!;
+                    var accessor = entry.Accessor!;
 
-                if (accessor.CanHandle != null && !accessor.CanHandle(entry.Handler, request))
-                    return;
+                    if (accessor.CanHandle != null && !accessor.CanHandle(entry.Handler, request))
+                        continue;
 
-                await ((Task)accessor.Handle(entry.Handler, request)).ConfigureAwait(false);
-            });
+                    await ((Task)accessor.Handle(entry.Handler, request)).ConfigureAwait(false);
+                }
+            }
+            else
+            {
+                var v = invocations.Select(async entry =>
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
 
-            await Task.WhenAll(tasks).ConfigureAwait(false);
+                    var accessor = entry.Accessor!;
+
+                    if (accessor.CanHandle != null && !accessor.CanHandle(entry.Handler, request))
+                        return;
+
+                    await ((Task)accessor.Handle(entry.Handler, request)).ConfigureAwait(false);
+                });
+
+                await Task.WhenAll(tasks).ConfigureAwait(false);
+            }
         }
 
         /// <inheritdoc />
