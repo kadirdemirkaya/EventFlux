@@ -11,5 +11,12 @@ namespace EventFlux.Options
         /// When <c>false</c>, handlers and behaviors are resolved directly from the ambient service provider.
         /// </summary>
         public bool CreateScopePerEvent { get; set; } = true;
+
+        /// <summary>
+        /// Gets or sets the execution strategy for notification handlers during publish operations.
+        /// When <see cref="PublishStrategy.Parallel"/> (default), handlers run concurrently via <see cref="System.Threading.Tasks.Task.WhenAll"/>.
+        /// When <see cref="PublishStrategy.Sequential"/>, handlers run one after another in order of priority.
+        /// </summary>
+        public PublishStrategy PublishStrategy { get; set; } = PublishStrategy.Parallel;
     }
 }

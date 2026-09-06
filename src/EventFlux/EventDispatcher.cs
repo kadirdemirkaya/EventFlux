@@ -143,9 +143,18 @@ namespace EventFlux
 
             EventHandlerDelegate handlerDelegate = async ct =>
             {
-                var tasks = handlerTypes.Select(handler => InvokeHandlerAsync(handler, request, ct));
-
-                await Task.WhenAll(tasks).ConfigureAwait(false);
+                if (_options.PublishStrategy == PublishStrategy.Sequential)
+                {
+                    foreach (var handler in handlerTypes)
+                    {
+                        await InvokeHandlerAsync(handler, request, ct).ConfigureAwait(false);
+                    }
+                }
+                else
+                {
+                    var tasks = handlerTypes.Select(handler => InvokeHandlerAsync(handler, request, ct));
+                    await Task.WhenAll(tasks).ConfigureAwait(false);
+                }
             };
 
             foreach (var behavior in behaviors)
