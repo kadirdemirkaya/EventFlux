@@ -16,13 +16,15 @@
 		<RepositoryUrl>https://github.com/kadirdemirkaya/EventFlux</RepositoryUrl>
 		<RepositoryType>git</RepositoryType>
 		<PackageTags>CQRS EventBus EventSourcing .NET</PackageTags>
-		<AssemblyInformationalVersion>1.3.0</AssemblyInformationalVersion>
+		<AssemblyInformationalVersion>1.4.0</AssemblyInformationalVersion>
 		<PackageReadmeFile>README.md</PackageReadmeFile>
 		<PackageReleaseNotes>
-			- Added CancellationToken support to IEventBus and EventBus methods
-			- Resolved EventDispatcher.PublishAsync SemaphoreSlim(1) global concurrency bottleneck
-			- Registered EventService and EventMapService in the DI container as singletons
-			- Cleaned up unused fields and dead code in EventBus
+			v1.4.0:
+			- Added SourceLink and symbol package (.snupkg) support for source debugging
+			- Enabled XML documentation generation for IntelliSense
+			- Compiled expression trees for high-performance event dispatching
+			- Removed unused Microsoft.Extensions.Configuration.Abstractions dependency
+			- Hardened DI registrations and parameter null-checks
 		</PackageReleaseNotes>
 		<PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
 		<GenerateDocumentationFile>true</GenerateDocumentationFile>

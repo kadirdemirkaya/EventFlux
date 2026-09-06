@@ -21,10 +21,16 @@ EventFlux is a lightweight and performance-focused event processing library for 
 
 ## Quick Start
 
-1. Install a package from NuGet (package name provided as an example):
+1. Install a package from NuGet:
 
 ```powershell
-dotnet add package EventFlux
+dotnet add package EventFlux --version 1.4.0
+```
+
+Or via `<PackageReference>` in your `.csproj`:
+
+```xml
+<PackageReference Include="EventFlux" Version="1.4.0" />
 ```
 
 2. Add services in Program.cs / Startup.cs:
