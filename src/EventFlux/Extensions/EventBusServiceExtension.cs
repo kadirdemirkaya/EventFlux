@@ -1,5 +1,6 @@
 using EventFlux.Abstractions;
 using EventFlux.Behaviors;
+using EventFlux.Options;
 using EventFlux.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -23,6 +24,20 @@ namespace EventFlux.Extensions
         /// <exception cref="ArgumentException">Thrown when <paramref name="assemblies"/> is null, empty, or contains only null items.</exception>
         public static IServiceCollection AddEventBus(this IServiceCollection services, params Assembly[] assemblies)
         {
+            return AddEventBus(services, (Action<EventFluxOptions>?)null, assemblies);
+        }
+
+        /// <summary>
+        /// Registers EventFlux event bus infrastructure with custom options, scanning provided assemblies for handlers.
+        /// </summary>
+        /// <param name="services">The service collection to register into.</param>
+        /// <param name="configureOptions">Action to configure <see cref="EventFluxOptions"/>.</param>
+        /// <param name="assemblies">Assemblies to scan for event handlers.</param>
+        /// <returns>The service collection for chaining.</returns>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="services"/> is null.</exception>
+        /// <exception cref="ArgumentException">Thrown when <paramref name="assemblies"/> is null, empty, or contains only null items.</exception>
+        public static IServiceCollection AddEventBus(this IServiceCollection services, Action<EventFluxOptions>? configureOptions, params Assembly[] assemblies)
+        {
             if (services is null)
             {
                 throw new ArgumentNullException(nameof(services));
@@ -37,6 +52,18 @@ namespace EventFlux.Extensions
             if (validAssemblies.Length == 0)
             {
                 throw new ArgumentException("At least one valid assembly must be provided.", nameof(assemblies));
+            }
+
+            if (configureOptions is not null)
+            {
+                var options = new EventFluxOptions();
+                configureOptions(options);
+                services.RemoveAll<EventFluxOptions>();
+                services.AddSingleton(options);
+            }
+            else
+            {
+                services.TryAddSingleton<EventFluxOptions>();
             }
 
             List<Type> handlers = new();
@@ -137,7 +164,8 @@ namespace EventFlux.Extensions
                     _dictionaryService,
                     _eventDictionaryMapService,
                     handlers,
-                    sp.GetRequiredService<ILogger<EventBus>>()
+                    sp.GetRequiredService<ILogger<EventBus>>(),
+                    sp.GetService<EventFluxOptions>()
                 )
             );
 
@@ -152,9 +180,33 @@ namespace EventFlux.Extensions
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="services"/> is null.</exception>
         public static IServiceCollection AddEventDispatcher(this IServiceCollection services)
         {
+            return AddEventDispatcher(services, (Action<EventFluxOptions>?)null);
+        }
+
+        /// <summary>
+        /// Registers <see cref="IEventDispatcher"/> for pipeline behavior-aware event dispatching with custom options.
+        /// </summary>
+        /// <param name="services">The service collection to register into.</param>
+        /// <param name="configureOptions">Action to configure <see cref="EventFluxOptions"/>.</param>
+        /// <returns>The service collection for chaining.</returns>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="services"/> is null.</exception>
+        public static IServiceCollection AddEventDispatcher(this IServiceCollection services, Action<EventFluxOptions>? configureOptions)
+        {
             if (services is null)
             {
                 throw new ArgumentNullException(nameof(services));
+            }
+
+            if (configureOptions is not null)
+            {
+                var options = new EventFluxOptions();
+                configureOptions(options);
+                services.RemoveAll<EventFluxOptions>();
+                services.AddSingleton(options);
+            }
+            else
+            {
+                services.TryAddSingleton<EventFluxOptions>();
             }
 
             services.TryAddTransient<IEventDispatcher, EventDispatcher>();

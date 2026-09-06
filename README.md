@@ -230,6 +230,24 @@ public class OrderService
 }
 ```
 
+### 5. Dependency Injection Scope Configuration (`EventFluxOptions`)
+
+By default, EventFlux creates an isolated child dependency injection scope for every dispatched event (`CreateScopePerEvent = true`). If your handlers need to share the exact same ambient scope as the caller (for instance, sharing an EF Core `DbContext` transaction, Unit of Work, or current user context), you can configure this via `EventFluxOptions`:
+
+```csharp
+// Configure on EventBus
+builder.Services.AddEventBus(options =>
+{
+    options.CreateScopePerEvent = false; // Handlers share the caller's DI scope
+}, typeof(Program).Assembly);
+
+// Configure on EventDispatcher
+builder.Services.AddEventDispatcher(options =>
+{
+    options.CreateScopePerEvent = false;
+});
+```
+
 ---
 
 ## Ecosystem & Extensions

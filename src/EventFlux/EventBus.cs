@@ -1,5 +1,6 @@
 using EventFlux.Abstractions;
 using EventFlux.Internal;
+using EventFlux.Options;
 using EventFlux.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -17,12 +18,16 @@ namespace EventFlux
     {
         private readonly ILogger<EventBus>? _logger;
         private readonly IServiceProvider? _serviceProvider;
+        private readonly EventFluxOptions _options;
         private readonly EventStackService _eventStackDictionaryService = new();
 
         /// <summary>
         /// Initializes a new instance of the <see cref="EventBus"/> class.
         /// </summary>
-        public EventBus() { }
+        public EventBus()
+        {
+            _options = new EventFluxOptions();
+        }
 
         /// <summary>
         /// Initializes a new instance of the <see cref="EventBus"/> class with DI service provider and logger.
@@ -30,9 +35,21 @@ namespace EventFlux
         /// <param name="serviceProvider">The service provider used to resolve handlers.</param>
         /// <param name="logger">Logger instance.</param>
         public EventBus(IServiceProvider serviceProvider, ILogger<EventBus> logger)
+            : this(serviceProvider, logger, null)
+        {
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="EventBus"/> class with DI service provider, logger, and options.
+        /// </summary>
+        /// <param name="serviceProvider">The service provider used to resolve handlers.</param>
+        /// <param name="logger">Logger instance.</param>
+        /// <param name="options">Configuration options.</param>
+        public EventBus(IServiceProvider serviceProvider, ILogger<EventBus> logger, EventFluxOptions? options)
         {
             _logger = logger;
             _serviceProvider = serviceProvider;
+            _options = options ?? serviceProvider?.GetService<EventFluxOptions>() ?? new EventFluxOptions();
         }
 
         /// <summary>
@@ -42,7 +59,7 @@ namespace EventFlux
         /// <param name="assemblies">Assemblies containing handlers.</param>
         /// <param name="logger">Logger instance.</param>
         public EventBus(IServiceProvider serviceProvider, IEnumerable<Assembly> assemblies, ILogger<EventBus> logger)
-            : this(serviceProvider, logger)
+            : this(serviceProvider, logger, null)
         {
         }
 
@@ -55,7 +72,7 @@ namespace EventFlux
         /// <param name="eventDictionaryMapService">Event map service registry.</param>
         /// <param name="logger">Logger instance.</param>
         public EventBus(IServiceProvider serviceProvider, IEnumerable<Assembly> assemblies, EventService dictionaryService, EventMapService eventDictionaryMapService, ILogger<EventBus> logger)
-            : this(serviceProvider, logger)
+            : this(serviceProvider, logger, null)
         {
         }
 
@@ -69,7 +86,22 @@ namespace EventFlux
         /// <param name="handlers">Handler types list.</param>
         /// <param name="logger">Logger instance.</param>
         public EventBus(IServiceProvider serviceProvider, IEnumerable<Assembly> assemblies, EventService dictionaryService, EventMapService eventDictionaryMapService, IEnumerable<Type> handlers, ILogger<EventBus> logger)
-            : this(serviceProvider, logger)
+            : this(serviceProvider, logger, null)
+        {
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="EventBus"/> class with full parameters including options.
+        /// </summary>
+        /// <param name="serviceProvider">The service provider used to resolve handlers.</param>
+        /// <param name="assemblies">Assemblies containing handlers.</param>
+        /// <param name="dictionaryService">Event service registry.</param>
+        /// <param name="eventDictionaryMapService">Event map service registry.</param>
+        /// <param name="handlers">Handler types list.</param>
+        /// <param name="logger">Logger instance.</param>
+        /// <param name="options">Configuration options.</param>
+        public EventBus(IServiceProvider serviceProvider, IEnumerable<Assembly> assemblies, EventService dictionaryService, EventMapService eventDictionaryMapService, IEnumerable<Type> handlers, ILogger<EventBus> logger, EventFluxOptions? options)
+            : this(serviceProvider, logger, options)
         {
         }
 
@@ -86,11 +118,23 @@ namespace EventFlux
 
             var serviceProvider = RequireServiceProvider();
 
+            if (_options.CreateScopePerEvent)
+            {
+                using var scope = serviceProvider.CreateScope();
+                return await DispatchSendAsync<TResponse>(scope.ServiceProvider, request).ConfigureAwait(false);
+            }
+
+            return await DispatchSendAsync<TResponse>(serviceProvider, request).ConfigureAwait(false);
+        }
+
+        private static async Task<TResponse?> DispatchSendAsync<TResponse>(
+            IServiceProvider serviceProvider,
+            IEventRequest<TResponse> request)
+            where TResponse : IEventResponse
+        {
             var handlerType = DispatchTypeCache.RequestHandlerType(request.GetType(), typeof(TResponse));
 
-            using var scope = serviceProvider.CreateScope();
-
-            var handler = scope.ServiceProvider.GetRequiredService(handlerType);
+            var handler = serviceProvider.GetRequiredService(handlerType);
 
             var task = (Task<TResponse>)DispatchTypeCache.ForInterface(handlerType).Handle(handler, request);
 
@@ -107,15 +151,29 @@ namespace EventFlux
 
             cancellationToken.ThrowIfCancellationRequested();
 
-            var eventType = request.GetType();
-
             var serviceProvider = RequireServiceProvider();
 
-            using var scope = serviceProvider.CreateScope();
+            if (_options.CreateScopePerEvent)
+            {
+                using var scope = serviceProvider.CreateScope();
+                await DispatchPublishAsync(scope.ServiceProvider, request, cancellationToken).ConfigureAwait(false);
+            }
+            else
+            {
+                await DispatchPublishAsync(serviceProvider, request, cancellationToken).ConfigureAwait(false);
+            }
+        }
+
+        private static async Task DispatchPublishAsync(
+            IServiceProvider serviceProvider,
+            IEventRequest request,
+            CancellationToken cancellationToken)
+        {
+            var eventType = request.GetType();
 
             var handlerType = DispatchTypeCache.NotificationHandlerType(eventType);
 
-            var handlers = scope.ServiceProvider.GetServices(handlerType);
+            var handlers = serviceProvider.GetServices(handlerType);
 
             var invocations = handlers
                 .Where(handler => handler is not null)

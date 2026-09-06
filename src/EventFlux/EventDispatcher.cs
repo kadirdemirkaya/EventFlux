@@ -2,6 +2,7 @@ using EventFlux.Abstractions;
 using EventFlux.Attributes;
 using EventFlux.Delegates;
 using EventFlux.Internal;
+using EventFlux.Options;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System;
@@ -17,6 +18,7 @@ namespace EventFlux
     {
         private readonly IServiceProvider _serviceProvider;
         private readonly ILogger<EventDispatcher> _logger;
+        private readonly EventFluxOptions _options;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="EventDispatcher"/> class.
@@ -24,9 +26,21 @@ namespace EventFlux
         /// <param name="serviceProvider">The service provider to resolve handlers and behaviors.</param>
         /// <param name="logger">Logger instance.</param>
         public EventDispatcher(IServiceProvider serviceProvider, ILogger<EventDispatcher> logger)
+            : this(serviceProvider, logger, null)
+        {
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="EventDispatcher"/> class with options.
+        /// </summary>
+        /// <param name="serviceProvider">The service provider to resolve handlers and behaviors.</param>
+        /// <param name="logger">Logger instance.</param>
+        /// <param name="options">Configuration options.</param>
+        public EventDispatcher(IServiceProvider serviceProvider, ILogger<EventDispatcher> logger, EventFluxOptions? options)
         {
             _serviceProvider = serviceProvider;
             _logger = logger;
+            _options = options ?? serviceProvider?.GetService<EventFluxOptions>() ?? new EventFluxOptions();
         }
 
         /// <inheritdoc />
@@ -35,42 +49,53 @@ namespace EventFlux
            CancellationToken cancellationToken = default)
            where TResponse : IEventResponse
         {
-            using (var scope = _serviceProvider.CreateScope())
+            if (_options.CreateScopePerEvent)
             {
-                var requestType = request.GetType();
+                using var scope = _serviceProvider.CreateScope();
+                return await DispatchSendAsync(scope.ServiceProvider, request, cancellationToken).ConfigureAwait(false);
+            }
 
-                var handlerType = DispatchTypeCache.RequestHandlerType(requestType, typeof(TResponse));
-                var handler = scope.ServiceProvider.GetRequiredService(handlerType);
+            return await DispatchSendAsync(_serviceProvider, request, cancellationToken).ConfigureAwait(false);
+        }
 
-                var behaviorType = DispatchTypeCache.RequestPipelineType(requestType, typeof(TResponse));
-                var behaviors = scope.ServiceProvider.GetServices(behaviorType).Reverse().ToList();
+        private async Task<TResponse> DispatchSendAsync<TResponse>(
+            IServiceProvider serviceProvider,
+            IEventRequest<TResponse> request,
+            CancellationToken cancellationToken)
+            where TResponse : IEventResponse
+        {
+            var requestType = request.GetType();
 
-                var accessor = DispatchTypeCache.ForInterface(handlerType);
+            var handlerType = DispatchTypeCache.RequestHandlerType(requestType, typeof(TResponse));
+            var handler = serviceProvider.GetRequiredService(handlerType);
 
-                EventHandlerDelegate<TResponse> handlerDelegate = (cancellationToken) =>
+            var behaviorType = DispatchTypeCache.RequestPipelineType(requestType, typeof(TResponse));
+            var behaviors = serviceProvider.GetServices(behaviorType).Reverse().ToList();
+
+            var accessor = DispatchTypeCache.ForInterface(handlerType);
+
+            EventHandlerDelegate<TResponse> handlerDelegate = (cancellationToken) =>
+            {
+                if (accessor.CanHandle != null && accessor.CanHandle(handler, request) is bool result && !result)
                 {
-                    if (accessor.CanHandle != null && accessor.CanHandle(handler, request) is bool result && !result)
-                    {
-                        _logger.LogInformation("Handler {Handler} cannot handle event {EventName}. Skipping.", handlerType.Name, requestType.Name);
+                    _logger.LogInformation("Handler {Handler} cannot handle event {EventName}. Skipping.", handlerType.Name, requestType.Name);
 
-                        return Task.FromResult<TResponse>(default!);
-                    }
-
-                    return (Task<TResponse>)accessor.Handle(handler, request);
-                };
-
-
-                foreach (var behavior in behaviors)
-                {
-                    var next = handlerDelegate;
-                    var behaviorInvoker = DispatchTypeCache.BehaviorInvoker(behavior!.GetType());
-
-                    handlerDelegate = (cancellationToken) =>
-                        (Task<TResponse>)behaviorInvoker(behavior, request, next, cancellationToken);
+                    return Task.FromResult<TResponse>(default!);
                 }
 
-                return await handlerDelegate(cancellationToken).ConfigureAwait(false);
+                return (Task<TResponse>)accessor.Handle(handler, request);
+            };
+
+            foreach (var behavior in behaviors)
+            {
+                var next = handlerDelegate;
+                var behaviorInvoker = DispatchTypeCache.BehaviorInvoker(behavior!.GetType());
+
+                handlerDelegate = (cancellationToken) =>
+                    (Task<TResponse>)behaviorInvoker(behavior, request, next, cancellationToken);
             }
+
+            return await handlerDelegate(cancellationToken).ConfigureAwait(false);
         }
 
         /// <inheritdoc />
@@ -80,12 +105,26 @@ namespace EventFlux
         {
             cancellationToken.ThrowIfCancellationRequested();
 
+            if (_options.CreateScopePerEvent)
+            {
+                using var scope = _serviceProvider.CreateScope();
+                await DispatchPublishAsync(scope.ServiceProvider, request, cancellationToken).ConfigureAwait(false);
+            }
+            else
+            {
+                await DispatchPublishAsync(_serviceProvider, request, cancellationToken).ConfigureAwait(false);
+            }
+        }
+
+        private async Task DispatchPublishAsync(
+            IServiceProvider serviceProvider,
+            IEventRequest request,
+            CancellationToken cancellationToken)
+        {
             var requestType = request.GetType();
             var handlerInterface = DispatchTypeCache.NotificationHandlerType(requestType);
 
-            using var scope = _serviceProvider.CreateScope();
-
-            var handlerTypes = scope.ServiceProvider
+            var handlerTypes = serviceProvider
                 .GetServices(handlerInterface)
                 .OrderBy(h =>
                     h.GetType().GetCustomAttribute<HandlerOrderAttribute>()?.Priority ?? 0)
@@ -96,7 +135,7 @@ namespace EventFlux
 
             var behaviorType = DispatchTypeCache.NotificationPipelineType(requestType);
 
-            var behaviors = scope.ServiceProvider
+            var behaviors = serviceProvider
                 .GetServices(behaviorType)
                 .Cast<object>()
                 .Reverse()
