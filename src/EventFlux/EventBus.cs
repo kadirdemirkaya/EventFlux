@@ -201,7 +201,7 @@ namespace EventFlux
             }
             else
             {
-                var v = invocations.Select(async entry =>
+                var tasks = invocations.Select(async entry =>
                 {
                     cancellationToken.ThrowIfCancellationRequested();
 
