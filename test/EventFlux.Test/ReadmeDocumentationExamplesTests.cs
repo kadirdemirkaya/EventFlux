@@ -2,6 +2,7 @@ using EventFlux.Abstractions;
 using EventFlux.Attributes;
 using EventFlux.Delegates;
 using EventFlux.Extensions;
+using EventFlux.Options;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
@@ -186,6 +187,25 @@ namespace EventFlux.Test
             await eventBus.StackEventDispatcherAsync();
 
             Assert.Equal(2, OrderShippedHandler.ShippedCount);
+        }
+
+        [Fact]
+        public void Readme_ScopeConfiguration_AllowsAmbientScope()
+        {
+            var services = new ServiceCollection();
+            services.AddLogging();
+            services.AddEventBus(options =>
+            {
+                options.CreateScopePerEvent = false;
+            }, typeof(ReadmeDocumentationExamplesTests).Assembly);
+            services.AddEventDispatcher(options =>
+            {
+                options.CreateScopePerEvent = false;
+            });
+
+            using var sp = services.BuildServiceProvider();
+            var options = sp.GetRequiredService<EventFluxOptions>();
+            Assert.False(options.CreateScopePerEvent);
         }
     }
 }
