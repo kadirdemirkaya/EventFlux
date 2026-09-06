@@ -10,17 +10,26 @@ using System.Reflection;
 
 namespace EventFlux
 {
+    /// <summary>
+    /// Transient implementation of <see cref="IEventDispatcher"/> supporting custom pipeline behaviors.
+    /// </summary>
     public class EventDispatcher : IEventDispatcher
     {
         private readonly IServiceProvider _serviceProvider;
         private readonly ILogger<EventDispatcher> _logger;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="EventDispatcher"/> class.
+        /// </summary>
+        /// <param name="serviceProvider">The service provider to resolve handlers and behaviors.</param>
+        /// <param name="logger">Logger instance.</param>
         public EventDispatcher(IServiceProvider serviceProvider, ILogger<EventDispatcher> logger)
         {
             _serviceProvider = serviceProvider;
             _logger = logger;
         }
 
+        /// <inheritdoc />
         public async Task<TResponse> SendAsync<TResponse>(
            IEventRequest<TResponse> request,
            CancellationToken cancellationToken = default)
@@ -64,6 +73,7 @@ namespace EventFlux
             }
         }
 
+        /// <inheritdoc />
         public async Task PublishAsync(
            IEventRequest request,
            CancellationToken cancellationToken = default)
