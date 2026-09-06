@@ -1,4 +1,4 @@
-﻿using System.Reflection;
+using System.Reflection;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
@@ -7,21 +7,38 @@ using EventFlux.Abstractions;
 
 namespace EventFlux.Services
 {
+    /// <summary>
+    /// Service managing event-to-handler type mappings and registrations.
+    /// </summary>
     public class EventService
     {
         private readonly IEnumerable<Assembly> _assemblies;
         private readonly ConcurrentDictionary<Type, ConcurrentDictionary<Type, byte>> _internalEventHandlers;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="EventService"/> class.
+        /// </summary>
         public EventService()
         {
             _assemblies = null;
             _internalEventHandlers = new ConcurrentDictionary<Type, ConcurrentDictionary<Type, byte>>();
         }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="EventService"/> class with assemblies.
+        /// </summary>
+        /// <param name="assemblies">Assemblies containing event handlers.</param>
         public EventService(IEnumerable<Assembly> assemblies)
         {
             _assemblies = assemblies;
             _internalEventHandlers = new ConcurrentDictionary<Type, ConcurrentDictionary<Type, byte>>();
         }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="EventService"/> class with initial event handlers.
+        /// </summary>
+        /// <param name="assemblies">Assemblies containing event handlers.</param>
+        /// <param name="internalEventHandlers">Initial map of event types to handler types.</param>
         public EventService(IEnumerable<Assembly> assemblies, Dictionary<Type, List<Type>> internalEventHandlers)
         {
             _assemblies = assemblies;
@@ -41,8 +58,19 @@ namespace EventFlux.Services
             }
         }
 
+        /// <summary>
+        /// Gets the current dictionary of event types and their subscribed handler types.
+        /// </summary>
         public Dictionary<Type, List<Type>> InternalEventHandlers => _internalEventHandlers.ToDictionary(kv => kv.Key, kv => kv.Value.Keys.ToList());
 
+        /// <summary>
+        /// Checks whether a handler is subscribed to an event type.
+        /// </summary>
+        /// <typeparam name="TEvent">The event type.</typeparam>
+        /// <typeparam name="THandler">The handler type.</typeparam>
+        /// <param name="event">The event instance.</param>
+        /// <param name="handler">The handler instance.</param>
+        /// <returns><c>true</c> if subscribed; otherwise <c>false</c>.</returns>
         public bool IsSubscribe<TEvent, THandler>(TEvent @event, THandler @handler)
             where THandler : class
         {
@@ -55,6 +83,11 @@ namespace EventFlux.Services
             return inner.ContainsKey(handlerType);
         }
 
+        /// <summary>
+        /// Subscribes a handler type to an event type.
+        /// </summary>
+        /// <typeparam name="TEvent">The event type.</typeparam>
+        /// <typeparam name="THandler">The handler type.</typeparam>
         public void Subscribe<TEvent, THandler>()
             where THandler : class
         {
@@ -65,6 +98,11 @@ namespace EventFlux.Services
             inner.TryAdd(handlerType, 0);
         }
 
+        /// <summary>
+        /// Gets the list of handler types registered for the specified event type.
+        /// </summary>
+        /// <param name="eventType">The event type.</param>
+        /// <returns>A list of handler types, or null if none registered.</returns>
         public List<Type> GetHandlersForEvent(Type eventType)
         {
             if (_internalEventHandlers.TryGetValue(eventType, out var inner))
@@ -75,6 +113,13 @@ namespace EventFlux.Services
             return null;
         }
 
+        /// <summary>
+        /// Subscribes a handler instance to an event.
+        /// </summary>
+        /// <typeparam name="TEvent">The event type.</typeparam>
+        /// <typeparam name="THandler">The handler type.</typeparam>
+        /// <param name="event">The event instance.</param>
+        /// <param name="handler">The handler instance.</param>
         public void Subscribe<TEvent, THandler>(TEvent @event, THandler @handler)
             where THandler : class
         {
@@ -85,6 +130,11 @@ namespace EventFlux.Services
             inner.TryAdd(handlerType, 0);
         }
 
+        /// <summary>
+        /// Unsubscribes a handler type from an event type.
+        /// </summary>
+        /// <typeparam name="TEvent">The event type.</typeparam>
+        /// <typeparam name="THandler">The handler type.</typeparam>
         public void Unsubscribe<TEvent, THandler>()
             where THandler : class
         {
@@ -102,6 +152,9 @@ namespace EventFlux.Services
             }
         }
 
+        /// <summary>
+        /// Scans configured assemblies to discover and register event handler types.
+        /// </summary>
         public void FindEventHandlers()
         {
             var handlerTypes = _assemblies

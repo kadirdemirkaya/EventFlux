@@ -1,4 +1,4 @@
-﻿using EventFlux.Abstractions;
+using EventFlux.Abstractions;
 using EventFlux.Internal;
 using EventFlux.Services;
 using Microsoft.Extensions.DependencyInjection;
@@ -10,35 +10,70 @@ using System.Threading.Tasks;
 
 namespace EventFlux
 {
+    /// <summary>
+    /// Default scoped implementation of <see cref="IEventBus"/> providing request-response and notification dispatching.
+    /// </summary>
     public class EventBus : IEventBus
     {
         private readonly ILogger<EventBus>? _logger;
         private readonly IServiceProvider? _serviceProvider;
         private readonly EventStackService _eventStackDictionaryService = new();
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="EventBus"/> class.
+        /// </summary>
         public EventBus() { }
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="EventBus"/> class with DI service provider and logger.
+        /// </summary>
+        /// <param name="serviceProvider">The service provider used to resolve handlers.</param>
+        /// <param name="logger">Logger instance.</param>
         public EventBus(IServiceProvider serviceProvider, ILogger<EventBus> logger)
         {
             _logger = logger;
             _serviceProvider = serviceProvider;
         }
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="EventBus"/> class with assemblies.
+        /// </summary>
+        /// <param name="serviceProvider">The service provider used to resolve handlers.</param>
+        /// <param name="assemblies">Assemblies containing handlers.</param>
+        /// <param name="logger">Logger instance.</param>
         public EventBus(IServiceProvider serviceProvider, IEnumerable<Assembly> assemblies, ILogger<EventBus> logger)
             : this(serviceProvider, logger)
         {
         }
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="EventBus"/> class with services.
+        /// </summary>
+        /// <param name="serviceProvider">The service provider used to resolve handlers.</param>
+        /// <param name="assemblies">Assemblies containing handlers.</param>
+        /// <param name="dictionaryService">Event service registry.</param>
+        /// <param name="eventDictionaryMapService">Event map service registry.</param>
+        /// <param name="logger">Logger instance.</param>
         public EventBus(IServiceProvider serviceProvider, IEnumerable<Assembly> assemblies, EventService dictionaryService, EventMapService eventDictionaryMapService, ILogger<EventBus> logger)
             : this(serviceProvider, logger)
         {
         }
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="EventBus"/> class with handlers list.
+        /// </summary>
+        /// <param name="serviceProvider">The service provider used to resolve handlers.</param>
+        /// <param name="assemblies">Assemblies containing handlers.</param>
+        /// <param name="dictionaryService">Event service registry.</param>
+        /// <param name="eventDictionaryMapService">Event map service registry.</param>
+        /// <param name="handlers">Handler types list.</param>
+        /// <param name="logger">Logger instance.</param>
         public EventBus(IServiceProvider serviceProvider, IEnumerable<Assembly> assemblies, EventService dictionaryService, EventMapService eventDictionaryMapService, IEnumerable<Type> handlers, ILogger<EventBus> logger)
             : this(serviceProvider, logger)
         {
         }
 
+        /// <inheritdoc />
         public async Task<TResponse?> SendAsync<TResponse>(
             IEventRequest<TResponse> request,
             CancellationToken cancellationToken = default)
@@ -62,6 +97,7 @@ namespace EventFlux
             return await task.ConfigureAwait(false);
         }
 
+        /// <inheritdoc />
         public async Task PublishAsync(
             IEventRequest request,
             CancellationToken cancellationToken = default)
@@ -106,6 +142,7 @@ namespace EventFlux
             await Task.WhenAll(tasks).ConfigureAwait(false);
         }
 
+        /// <inheritdoc />
         public async Task StackEventDispatcherAsync(CancellationToken cancellationToken = default)
         {
             var events = _eventStackDictionaryService.Drain();
@@ -134,6 +171,7 @@ namespace EventFlux
                 $"{nameof(EventBus)} was created without a service provider. Resolve {nameof(IEventBus)} from the dependency injection container after calling AddEventBus(), instead of constructing it directly.");
         }
 
+        /// <inheritdoc />
         public void AddStackRequestEvent<TEvent>(TEvent eventRequest) where TEvent : IEventRequest
             => _eventStackDictionaryService.AddEventRequest(eventRequest);
     }

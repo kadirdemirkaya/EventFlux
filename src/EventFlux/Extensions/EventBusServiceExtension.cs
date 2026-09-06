@@ -8,8 +8,19 @@ using System.Reflection;
 
 namespace EventFlux.Extensions
 {
+    /// <summary>
+    /// Extension methods for setting up EventFlux services in an <see cref="IServiceCollection"/>.
+    /// </summary>
     public static class EventBusServiceExtension
     {
+        /// <summary>
+        /// Registers EventFlux event bus infrastructure, scanning provided assemblies for handlers.
+        /// </summary>
+        /// <param name="services">The service collection to register into.</param>
+        /// <param name="assemblies">Assemblies to scan for event handlers.</param>
+        /// <returns>The service collection for chaining.</returns>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="services"/> is null.</exception>
+        /// <exception cref="ArgumentException">Thrown when <paramref name="assemblies"/> is null, empty, or contains only null items.</exception>
         public static IServiceCollection AddEventBus(this IServiceCollection services, params Assembly[] assemblies)
         {
             if (services is null)
@@ -133,6 +144,12 @@ namespace EventFlux.Extensions
             return services;
         }
 
+        /// <summary>
+        /// Registers <see cref="IEventDispatcher"/> for pipeline behavior-aware event dispatching.
+        /// </summary>
+        /// <param name="services">The service collection to register into.</param>
+        /// <returns>The service collection for chaining.</returns>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="services"/> is null.</exception>
         public static IServiceCollection AddEventDispatcher(this IServiceCollection services)
         {
             if (services is null)
@@ -145,6 +162,12 @@ namespace EventFlux.Extensions
             return services;
         }
 
+        /// <summary>
+        /// Registers built-in logging pipeline behaviors for request and notification dispatching.
+        /// </summary>
+        /// <param name="services">The service collection to register into.</param>
+        /// <returns>The service collection for chaining.</returns>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="services"/> is null.</exception>
         public static IServiceCollection AddEventLogging(this IServiceCollection services)
         {
             if (services is null)
@@ -158,6 +181,12 @@ namespace EventFlux.Extensions
             return services;
         }
 
+        /// <summary>
+        /// Registers built-in timeout pipeline behaviors for request and notification dispatching.
+        /// </summary>
+        /// <param name="services">The service collection to register into.</param>
+        /// <returns>The service collection for chaining.</returns>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="services"/> is null.</exception>
         public static IServiceCollection AddEventTimeout(this IServiceCollection services)
         {
             if (services is null)
