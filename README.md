@@ -72,10 +72,10 @@ using EventFlux.Abstractions;
 public record CreateUserCommand(string Username, string Email) : IEventRequest<CreateUserResponse>;
 public record CreateUserResponse(Guid UserId, bool Success) : IEventResponse;
 
-// Define handler
+// Define handler (CancellationToken is optional via default interface method)
 public class CreateUserHandler : IEventHandler<CreateUserCommand, CreateUserResponse>
 {
-    public Task<CreateUserResponse> Handle(CreateUserCommand request)
+    public Task<CreateUserResponse> Handle(CreateUserCommand request, CancellationToken cancellationToken = default)
     {
         var userId = Guid.NewGuid();
         // Execute business logic...
@@ -255,6 +255,25 @@ builder.Services.AddEventDispatcher(options =>
     options.PublishStrategy = PublishStrategy.Sequential;
 });
 ```
+
+### 6. Cancellation Support (`CancellationToken`)
+
+Both `IEventHandler<TRequest, TResponse>` and `IEventHandler<TRequest>` provide `Handle` overloads accepting a `CancellationToken`. Handlers can inspect the token or forward it to asynchronous operations (e.g. database calls, HTTP requests, delays):
+
+```csharp
+public class ProcessPaymentHandler : IEventHandler<ProcessPaymentCommand, PaymentResponse>
+{
+    public async Task<PaymentResponse> Handle(ProcessPaymentCommand request, CancellationToken cancellationToken)
+    {
+        // Cancels in-flight work when client disconnects or timeout expires
+        var result = await _paymentGateway.ChargeAsync(request.Amount, cancellationToken);
+        return new PaymentResponse(result.IsSuccess);
+    }
+}
+```
+
+> **Backward Compatibility:**
+> Existing handlers implementing `Handle(request)` continue to work without any changes. Implementing the `CancellationToken` parameter is completely opt-in via C# default interface methods.
 
 ---
 

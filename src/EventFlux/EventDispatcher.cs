@@ -83,7 +83,7 @@ namespace EventFlux
                     return Task.FromResult<TResponse>(default!);
                 }
 
-                return (Task<TResponse>)accessor.Handle(handler, request);
+                return (Task<TResponse>)accessor.Handle(handler, request, cancellationToken);
             };
 
             foreach (var behavior in behaviors)
@@ -184,7 +184,7 @@ namespace EventFlux
             if (accessor.CanHandle != null && !accessor.CanHandle(handler, request))
                 return;
 
-            if (accessor.Handle(handler, request) is Task task)
+            if (accessor.Handle(handler, request, cancellationToken) is Task task)
                 await task.ConfigureAwait(false);
             else
                 throw new InvalidOperationException($"{handlerType.Name}.Handle must return Task");

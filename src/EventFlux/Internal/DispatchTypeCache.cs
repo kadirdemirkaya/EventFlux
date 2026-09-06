@@ -34,18 +34,23 @@ namespace EventFlux.Internal
 
         private static InterfaceAccessor BuildInterfaceAccessor(Type handlerInterfaceType)
         {
-            var handleMethod = handlerInterfaceType.GetMethod("Handle")
-                ?? throw new InvalidOperationException($"Handler method 'Handle' not found for {handlerInterfaceType.Name}");
-
             var requestType = handlerInterfaceType.GetGenericArguments()[0];
 
-            var canHandleMethod = handlerInterfaceType.GetMethod("CanHandle");
+            var handleMethod = handlerInterfaceType.GetMethod(
+                "Handle",
+                new[] { requestType, typeof(CancellationToken) })
+                ?? handlerInterfaceType.GetMethod(
+                    "Handle",
+                    new[] { requestType })
+                ?? throw new InvalidOperationException($"Handler method 'Handle' not found for {handlerInterfaceType.Name}");
+
+            var canHandleMethod = handlerInterfaceType.GetMethod("CanHandle", new[] { requestType });
 
             return new InterfaceAccessor(
                 HandlerAccessor.CompileInvoker(handlerInterfaceType, requestType, handleMethod),
                 canHandleMethod == null
                     ? null
-                    : HandlerAccessor.CompileInvoker(handlerInterfaceType, requestType, canHandleMethod));
+                    : HandlerAccessor.CompilePredicate(handlerInterfaceType, requestType, canHandleMethod));
         }
 
         private static Func<object, object, object, CancellationToken, object> BuildBehaviorInvoker(Type behaviorType)
@@ -80,14 +85,14 @@ namespace EventFlux.Internal
 
     internal sealed class InterfaceAccessor
     {
-        public InterfaceAccessor(Func<object, object, object> handle, Func<object, object, object>? canHandle)
+        public InterfaceAccessor(Func<object, object, CancellationToken, object> handle, Func<object, object, bool>? canHandle)
         {
             Handle = handle;
             CanHandle = canHandle;
         }
 
-        public Func<object, object, object> Handle { get; }
+        public Func<object, object, CancellationToken, object> Handle { get; }
 
-        public Func<object, object, object>? CanHandle { get; }
+        public Func<object, object, bool>? CanHandle { get; }
     }
 }

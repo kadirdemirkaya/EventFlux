@@ -121,22 +121,23 @@ namespace EventFlux
             if (_options.CreateScopePerEvent)
             {
                 using var scope = serviceProvider.CreateScope();
-                return await DispatchSendAsync<TResponse>(scope.ServiceProvider, request).ConfigureAwait(false);
+                return await DispatchSendAsync<TResponse>(scope.ServiceProvider, request, cancellationToken).ConfigureAwait(false);
             }
 
-            return await DispatchSendAsync<TResponse>(serviceProvider, request).ConfigureAwait(false);
+            return await DispatchSendAsync<TResponse>(serviceProvider, request, cancellationToken).ConfigureAwait(false);
         }
 
         private static async Task<TResponse?> DispatchSendAsync<TResponse>(
             IServiceProvider serviceProvider,
-            IEventRequest<TResponse> request)
+            IEventRequest<TResponse> request,
+            CancellationToken cancellationToken)
             where TResponse : IEventResponse
         {
             var handlerType = DispatchTypeCache.RequestHandlerType(request.GetType(), typeof(TResponse));
 
             var handler = serviceProvider.GetRequiredService(handlerType);
 
-            var task = (Task<TResponse>)DispatchTypeCache.ForInterface(handlerType).Handle(handler, request);
+            var task = (Task<TResponse>)DispatchTypeCache.ForInterface(handlerType).Handle(handler, request, cancellationToken);
 
             return await task.ConfigureAwait(false);
         }
@@ -196,7 +197,7 @@ namespace EventFlux
                     if (accessor.CanHandle != null && !accessor.CanHandle(entry.Handler, request))
                         continue;
 
-                    await ((Task)accessor.Handle(entry.Handler, request)).ConfigureAwait(false);
+                    await ((Task)accessor.Handle(entry.Handler, request, cancellationToken)).ConfigureAwait(false);
                 }
             }
             else
@@ -210,7 +211,7 @@ namespace EventFlux
                     if (accessor.CanHandle != null && !accessor.CanHandle(entry.Handler, request))
                         return;
 
-                    await ((Task)accessor.Handle(entry.Handler, request)).ConfigureAwait(false);
+                    await ((Task)accessor.Handle(entry.Handler, request, cancellationToken)).ConfigureAwait(false);
                 });
 
                 await Task.WhenAll(tasks).ConfigureAwait(false);

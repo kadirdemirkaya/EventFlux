@@ -21,7 +21,15 @@ namespace EventFlux.Abstractions
         /// </summary>
         /// <param name="event">The incoming event request.</param>
         /// <returns>The response produced by the handler.</returns>
-        Task<TResponse> Handle(TRequest @event);
+        Task<TResponse> Handle(TRequest @event) => Handle(@event, CancellationToken.None);
+
+        /// <summary>
+        /// Handles the request and returns a response asynchronously with cancellation token support.
+        /// </summary>
+        /// <param name="event">The incoming event request.</param>
+        /// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
+        /// <returns>The response produced by the handler.</returns>
+        Task<TResponse> Handle(TRequest @event, CancellationToken cancellationToken) => Handle(@event);
     }
 
     /// <summary>
@@ -43,6 +51,14 @@ namespace EventFlux.Abstractions
         /// </summary>
         /// <param name="event">The incoming notification event.</param>
         /// <returns>A task representing the asynchronous handle operation.</returns>
-        Task Handle(TRequest @event);
+        Task Handle(TRequest @event) => Handle(@event, CancellationToken.None);
+
+        /// <summary>
+        /// Handles the notification event asynchronously with cancellation token support.
+        /// </summary>
+        /// <param name="event">The incoming notification event.</param>
+        /// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
+        /// <returns>A task representing the asynchronous handle operation.</returns>
+        Task Handle(TRequest @event, CancellationToken cancellationToken) => Handle(@event);
     }
 }
