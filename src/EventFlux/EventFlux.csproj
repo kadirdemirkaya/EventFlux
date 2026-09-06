@@ -7,7 +7,7 @@
 		<Nullable>enable</Nullable>
 		<GeneratePackageOnBuild>true</GeneratePackageOnBuild>
 		<PackageId>EventFlux</PackageId>
-		<Version>1.4.0</Version>
+		<Version>1.4.1</Version>
 		<Authors>Kadir Demirkaya</Authors>
 		<Copyright>Copyright (c) 2025 Kadir Demirkaya</Copyright>
 		<PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
@@ -16,15 +16,14 @@
 		<RepositoryUrl>https://github.com/kadirdemirkaya/EventFlux</RepositoryUrl>
 		<RepositoryType>git</RepositoryType>
 		<PackageTags>CQRS EventBus EventSourcing .NET</PackageTags>
-		<AssemblyInformationalVersion>1.4.0</AssemblyInformationalVersion>
+		<AssemblyInformationalVersion>1.4.1</AssemblyInformationalVersion>
 		<PackageReadmeFile>README.md</PackageReadmeFile>
 		<PackageReleaseNotes>
-			v1.4.0:
-			- Added SourceLink and symbol package (.snupkg) support for source debugging
-			- Enabled XML documentation generation for IntelliSense
-			- Compiled expression trees for high-performance event dispatching
-			- Removed unused Microsoft.Extensions.Configuration.Abstractions dependency
-			- Hardened DI registrations and parameter null-checks
+			v1.4.1:
+			- Overhauled package documentation and README with tested, working examples
+			- Added comprehensive comparison guide between IEventBus and IEventDispatcher
+			- Fixed code snippets for custom pipeline behaviors and assembly scanning
+			- Verified all code examples with automated integration tests
 		</PackageReleaseNotes>
 		<PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
 		<GenerateDocumentationFile>true</GenerateDocumentationFile>
