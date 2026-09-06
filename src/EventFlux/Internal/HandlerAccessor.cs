@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Linq.Expressions;
 using System.Reflection;
+using EventFlux.Abstractions;
 using EventFlux.Attributes;
 
 namespace EventFlux.Internal
@@ -10,7 +11,7 @@ namespace EventFlux.Internal
         private HandlerAccessor(
             Type handlerType,
             int priority,
-            Func<object, object, object> handle,
+            Func<object, object, CancellationToken, object> handle,
             Func<object, object, bool>? canHandle)
         {
             HandlerType = handlerType;
@@ -23,7 +24,7 @@ namespace EventFlux.Internal
 
         public int Priority { get; }
 
-        public Func<object, object, object> Handle { get; }
+        public Func<object, object, CancellationToken, object> Handle { get; }
 
         public Func<object, object, bool>? CanHandle { get; }
 
@@ -36,12 +37,33 @@ namespace EventFlux.Internal
 
         private static HandlerAccessor? Build(Type handlerType, Type eventType)
         {
-            var handleMethod = handlerType.GetMethod(
+            var handleMethodWithToken = handlerType.GetMethod(
+                "Handle",
+                BindingFlags.Instance | BindingFlags.Public,
+                binder: null,
+                new[] { eventType, typeof(CancellationToken) },
+                modifiers: null);
+
+            var handleMethod = handleMethodWithToken ?? handlerType.GetMethod(
                 "Handle",
                 BindingFlags.Instance | BindingFlags.Public,
                 binder: null,
                 new[] { eventType },
                 modifiers: null);
+
+            if (handleMethod == null)
+            {
+                var notificationInterface = typeof(IEventHandler<>).MakeGenericType(eventType);
+                if (notificationInterface.IsAssignableFrom(handlerType))
+                {
+                    handleMethod = notificationInterface.GetMethod(
+                        "Handle",
+                        new[] { eventType, typeof(CancellationToken) })
+                        ?? notificationInterface.GetMethod(
+                            "Handle",
+                            new[] { eventType });
+                }
+            }
 
             if (handleMethod == null)
                 return null;
@@ -62,25 +84,40 @@ namespace EventFlux.Internal
                 canHandleMethod == null ? null : CompilePredicate(handlerType, eventType, canHandleMethod));
         }
 
-        public static Func<object, object, object> CompileInvoker(Type targetType, Type argumentType, MethodInfo method)
+        public static Func<object, object, CancellationToken, object> CompileInvoker(Type targetType, Type argumentType, MethodInfo method)
         {
             var targetParameter = Expression.Parameter(typeof(object), "target");
             var argumentParameter = Expression.Parameter(typeof(object), "argument");
+            var tokenParameter = Expression.Parameter(typeof(CancellationToken), "cancellationToken");
 
-            var call = Expression.Call(
-                Expression.Convert(targetParameter, targetType),
-                method,
-                Expression.Convert(argumentParameter, argumentType));
+            var parameters = method.GetParameters();
+            MethodCallExpression call;
+            if (parameters.Length == 2 && parameters[1].ParameterType == typeof(CancellationToken))
+            {
+                call = Expression.Call(
+                    Expression.Convert(targetParameter, targetType),
+                    method,
+                    Expression.Convert(argumentParameter, argumentType),
+                    tokenParameter);
+            }
+            else
+            {
+                call = Expression.Call(
+                    Expression.Convert(targetParameter, targetType),
+                    method,
+                    Expression.Convert(argumentParameter, argumentType));
+            }
 
             return Expression
-                .Lambda<Func<object, object, object>>(
+                .Lambda<Func<object, object, CancellationToken, object>>(
                     Expression.Convert(call, typeof(object)),
                     targetParameter,
-                    argumentParameter)
+                    argumentParameter,
+                    tokenParameter)
                 .Compile();
         }
 
-        private static Func<object, object, bool> CompilePredicate(Type targetType, Type argumentType, MethodInfo method)
+        public static Func<object, object, bool> CompilePredicate(Type targetType, Type argumentType, MethodInfo method)
         {
             var targetParameter = Expression.Parameter(typeof(object), "target");
             var argumentParameter = Expression.Parameter(typeof(object), "argument");

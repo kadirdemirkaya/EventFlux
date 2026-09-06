@@ -223,8 +223,35 @@ namespace EventFlux.Test
             });
 
             using var sp = services.BuildServiceProvider();
-            var options = sp.GetRequiredService<EventFluxOptions>();
-            Assert.Equal(PublishStrategy.Sequential, options.PublishStrategy);
+            var options2 = sp.GetRequiredService<EventFluxOptions>();
+            Assert.Equal(PublishStrategy.Sequential, options2.PublishStrategy);
+        }
+
+        public record UpdateUserEmailCommand(string Email) : IEventRequest<UpdateUserEmailResponse>;
+        public record UpdateUserEmailResponse(bool Success) : IEventResponse;
+
+        public class UpdateUserEmailHandler : IEventHandler<UpdateUserEmailCommand, UpdateUserEmailResponse>
+        {
+            public Task<UpdateUserEmailResponse> Handle(UpdateUserEmailCommand request, CancellationToken cancellationToken)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                return Task.FromResult(new UpdateUserEmailResponse(true));
+            }
+        }
+
+        [Fact]
+        public async Task Readme_CancellationTokenHandler_Works()
+        {
+            var services = new ServiceCollection();
+            services.AddLogging();
+            services.AddEventBus(typeof(ReadmeDocumentationExamplesTests).Assembly);
+
+            using var sp = services.BuildServiceProvider();
+            var eventBus = sp.GetRequiredService<IEventBus>();
+
+            var response = await eventBus.SendAsync(new UpdateUserEmailCommand("test@example.com"), CancellationToken.None);
+            Assert.NotNull(response);
+            Assert.True(response.Success);
         }
     }
 }
