@@ -1,4 +1,4 @@
-﻿using EventFlux.Abstractions;
+using EventFlux.Abstractions;
 using EventFlux.Delegates;
 using Microsoft.Extensions.Logging;
 
@@ -24,7 +24,7 @@ namespace EventFlux.Behaviors
             try
             {
                 var task = next(linkedCts.Token);
-                var completedTask = await Task.WhenAny(task, Task.Delay(Timeout.Infinite, linkedCts.Token));
+                var completedTask = await Task.WhenAny(task, Task.Delay(Timeout.Infinite, linkedCts.Token)).ConfigureAwait(false);
 
                 if (completedTask != task)
                 {
@@ -32,7 +32,7 @@ namespace EventFlux.Behaviors
                     throw new OperationCanceledException("Timeout occurred");
                 }
 
-                await task;
+                await task.ConfigureAwait(false);
             }
             catch (OperationCanceledException)
             {
@@ -72,7 +72,7 @@ namespace EventFlux.Behaviors
 
                 var timeoutTask = Task.Delay(Timeout.Infinite, linkedCts.Token);
 
-                var completedTask = await Task.WhenAny(task, timeoutTask);
+                var completedTask = await Task.WhenAny(task, timeoutTask).ConfigureAwait(false);
 
                 if (completedTask == timeoutTask)
                 {
@@ -81,7 +81,7 @@ namespace EventFlux.Behaviors
                     throw new OperationCanceledException("Timeout occurred");
                 }
 
-                return await task;
+                return await task.ConfigureAwait(false);
             }
             catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested)
             {

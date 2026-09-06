@@ -1,4 +1,4 @@
-﻿using EventFlux.Abstractions;
+using EventFlux.Abstractions;
 using EventFlux.Attributes;
 using EventFlux.Delegates;
 using EventFlux.Internal;
@@ -60,7 +60,7 @@ namespace EventFlux
                         (Task<TResponse>)behaviorInvoker(behavior, request, next, cancellationToken);
                 }
 
-                return await handlerDelegate(cancellationToken);
+                return await handlerDelegate(cancellationToken).ConfigureAwait(false);
             }
         }
 
