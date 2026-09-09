@@ -156,6 +156,7 @@ namespace EventFlux.Extensions
 
             services.AddSingleton<EventService>(_dictionaryService);
             services.AddSingleton<EventMapService>(_eventDictionaryMapService);
+            services.TryAddSingleton<EventStackService>();
 
             services.AddScoped<IEventBus>(sp =>
                 new EventBus(
@@ -165,7 +166,8 @@ namespace EventFlux.Extensions
                     _eventDictionaryMapService,
                     handlers,
                     sp.GetRequiredService<ILogger<EventBus>>(),
-                    sp.GetService<EventFluxOptions>()
+                    sp.GetService<EventFluxOptions>(),
+                    sp.GetService<EventStackService>()
                 )
             );
 

@@ -11,6 +11,16 @@ namespace EventFlux.Services
         private readonly ConcurrentQueue<IEventRequest> _queue = new();
 
         /// <summary>
+        /// Gets the number of event requests currently in the queue.
+        /// </summary>
+        public int Count => _queue.Count;
+
+        /// <summary>
+        /// Gets a value indicating whether the queue is empty.
+        /// </summary>
+        public bool IsEmpty => _queue.IsEmpty;
+
+        /// <summary>
         /// Enqueues an event request to the stack.
         /// </summary>
         /// <param name="request">The event request to enqueue.</param>
@@ -29,5 +39,10 @@ namespace EventFlux.Services
 
             return list;
         }
+
+        /// <summary>
+        /// Clears all event requests from the queue.
+        /// </summary>
+        public void Clear() => _queue.Clear();
     }
 }

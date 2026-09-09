@@ -233,6 +233,10 @@ public class OrderService
 }
 ```
 
+> **Thread-Safe Singleton Queue (`EventStackService`):**
+> Deferred events are held by a thread-safe `EventStackService` registered as a DI singleton. Events queued across different HTTP requests or DI scopes are preserved in the shared queue and can be drained and dispatched from any scope or background service. You can also inject `EventStackService` directly if your architecture requires queueing events without referencing `IEventBus`.
+
+
 ### 5. Advanced Configuration (`EventFluxOptions`)
 
 Customize execution behavior globally during registration:

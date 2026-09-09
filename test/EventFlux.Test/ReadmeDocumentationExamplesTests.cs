@@ -3,6 +3,7 @@ using EventFlux.Attributes;
 using EventFlux.Delegates;
 using EventFlux.Extensions;
 using EventFlux.Options;
+using EventFlux.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
@@ -184,6 +185,27 @@ namespace EventFlux.Test
             eventBus.AddStackRequestEvent(new OrderShippedEvent(101));
             eventBus.AddStackRequestEvent(new OrderShippedEvent(102));
 
+            await eventBus.StackEventDispatcherAsync();
+
+            Assert.Equal(2, OrderShippedHandler.ShippedCount);
+        }
+
+        [Fact]
+        public async Task Readme_BatchDispatch_WithDirectEventStackService_ExecutesQueuedEvents()
+        {
+            OrderShippedHandler.ShippedCount = 0;
+
+            var services = new ServiceCollection();
+            services.AddLogging();
+            services.AddEventBus(typeof(ReadmeDocumentationExamplesTests).Assembly);
+
+            using var sp = services.BuildServiceProvider();
+            var stackService = sp.GetRequiredService<EventStackService>();
+            stackService.AddEventRequest(new OrderShippedEvent(201));
+            stackService.AddEventRequest(new OrderShippedEvent(202));
+
+            using var scope = sp.CreateScope();
+            var eventBus = scope.ServiceProvider.GetRequiredService<IEventBus>();
             await eventBus.StackEventDispatcherAsync();
 
             Assert.Equal(2, OrderShippedHandler.ShippedCount);
