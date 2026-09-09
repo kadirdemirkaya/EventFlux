@@ -22,6 +22,7 @@ namespace EventFlux.Extensions
         /// <returns>The service collection for chaining.</returns>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="services"/> is null.</exception>
         /// <exception cref="ArgumentException">Thrown when <paramref name="assemblies"/> is null, empty, or contains only null items.</exception>
+        /// <exception cref="InvalidOperationException">Thrown when duplicate handlers for the same request type are detected.</exception>
         public static IServiceCollection AddEventBus(this IServiceCollection services, params Assembly[] assemblies)
         {
             return AddEventBus(services, (Action<EventFluxOptions>?)null, assemblies);
@@ -36,6 +37,7 @@ namespace EventFlux.Extensions
         /// <returns>The service collection for chaining.</returns>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="services"/> is null.</exception>
         /// <exception cref="ArgumentException">Thrown when <paramref name="assemblies"/> is null, empty, or contains only null items.</exception>
+        /// <exception cref="InvalidOperationException">Thrown when duplicate handlers for the same request type are detected.</exception>
         public static IServiceCollection AddEventBus(this IServiceCollection services, Action<EventFluxOptions>? configureOptions, params Assembly[] assemblies)
         {
             if (services is null)
@@ -48,7 +50,7 @@ namespace EventFlux.Extensions
                 throw new ArgumentException("At least one assembly must be provided.", nameof(assemblies));
             }
 
-            var validAssemblies = assemblies.Where(a => a is not null).ToArray();
+            var validAssemblies = assemblies.Where(a => a is not null).Distinct().ToArray();
             if (validAssemblies.Length == 0)
             {
                 throw new ArgumentException("At least one valid assembly must be provided.", nameof(assemblies));
@@ -72,6 +74,7 @@ namespace EventFlux.Extensions
             List<Type> handlers = new();
             Dictionary<Type, List<Type>> internalEventHandlers = new();
             Dictionary<Type, Type> internalEventMaps = new();
+            Dictionary<Type, Type> requestToHandlerMap = new();
             EventService _dictionaryService;
             EventMapService _eventDictionaryMapService;
 
@@ -79,7 +82,9 @@ namespace EventFlux.Extensions
                 .SelectMany(a => a.GetTypes())
                 .Where(t => !t.IsInterface && !t.IsAbstract)
                 .Where(t => t.GetInterfaces().Any(i =>
-                    i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IEventHandler<,>)));
+                    i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IEventHandler<,>)))
+                .Distinct()
+                .ToList();
 
             handlers.AddRange(handlerTypesWithResponse);
 
@@ -90,30 +95,41 @@ namespace EventFlux.Extensions
 
                 foreach (var interfaceType in interfaceTypes)
                 {
-                    var requestInjectType = typeof(IEventHandler<,>).MakeGenericType(interfaceType.GenericTypeArguments);
-
-                    services.Add(new ServiceDescriptor(requestInjectType, handlerType, options.HandlerLifetime));
-
                     var genericArgs = interfaceType.GetGenericArguments();
                     var requestType = genericArgs[0];
                     var responseType = genericArgs[1];
 
+                    if (requestToHandlerMap.TryGetValue(requestType, out var existingHandlerType))
                     {
-                        if (!internalEventHandlers.ContainsKey(requestType))
+                        if (existingHandlerType != handlerType)
                         {
-                            internalEventHandlers[requestType] = new List<Type>();
+                            throw new InvalidOperationException(
+                                $"Duplicate handler registration detected for request type '{requestType.FullName}'. " +
+                                $"Conflicting handlers: '{existingHandlerType.FullName}' and '{handlerType.FullName}'. " +
+                                "A request can only have one handler.");
                         }
-
-                        if (!internalEventHandlers[requestType].Contains(handlerType))
-                        {
-                            internalEventHandlers[requestType].Add(handlerType);
-                        }
+                        continue;
                     }
+
+                    requestToHandlerMap[requestType] = handlerType;
+
+                    var requestInjectType = typeof(IEventHandler<,>).MakeGenericType(interfaceType.GenericTypeArguments);
+
+                    services.Add(new ServiceDescriptor(requestInjectType, handlerType, options.HandlerLifetime));
+
+                    if (!internalEventHandlers.ContainsKey(requestType))
                     {
-                        if (!internalEventMaps.ContainsKey(requestType))
-                        {
-                            internalEventMaps[requestType] = responseType;
-                        }
+                        internalEventHandlers[requestType] = new List<Type>();
+                    }
+
+                    if (!internalEventHandlers[requestType].Contains(handlerType))
+                    {
+                        internalEventHandlers[requestType].Add(handlerType);
+                    }
+
+                    if (!internalEventMaps.ContainsKey(requestType))
+                    {
+                        internalEventMaps[requestType] = responseType;
                     }
                 }
             }
@@ -122,7 +138,9 @@ namespace EventFlux.Extensions
                 .SelectMany(a => a.GetTypes())
                 .Where(t => !t.IsInterface && !t.IsAbstract)
                 .Where(t => t.GetInterfaces().Any(i =>
-                    i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IEventHandler<>)));
+                    i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IEventHandler<>)))
+                .Distinct()
+                .ToList();
 
             handlers.AddRange(handlerTypes);
 
