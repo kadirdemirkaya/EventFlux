@@ -249,6 +249,21 @@ namespace EventFlux.Test
             Assert.Equal(PublishStrategy.Sequential, options2.PublishStrategy);
         }
 
+        [Fact]
+        public void Readme_HandlerLifetimeConfiguration_AllowsScoped()
+        {
+            var services = new ServiceCollection();
+            services.AddLogging();
+            services.AddEventBus(options =>
+            {
+                options.HandlerLifetime = ServiceLifetime.Scoped;
+            }, typeof(ReadmeDocumentationExamplesTests).Assembly);
+
+            using var sp = services.BuildServiceProvider();
+            var options = sp.GetRequiredService<EventFluxOptions>();
+            Assert.Equal(ServiceLifetime.Scoped, options.HandlerLifetime);
+        }
+
         public record UpdateUserEmailCommand(string Email) : IEventRequest<UpdateUserEmailResponse>;
         public record UpdateUserEmailResponse(bool Success) : IEventResponse;
 
