@@ -157,7 +157,7 @@ namespace EventFlux
             return await DispatchSendAsync<TResponse>(serviceProvider, request, cancellationToken).ConfigureAwait(false);
         }
 
-        private static async Task<TResponse?> DispatchSendAsync<TResponse>(
+        private async Task<TResponse?> DispatchSendAsync<TResponse>(
             IServiceProvider serviceProvider,
             IEventRequest<TResponse> request,
             CancellationToken cancellationToken)
@@ -167,7 +167,14 @@ namespace EventFlux
 
             var handler = serviceProvider.GetRequiredService(handlerType);
 
-            var task = (Task<TResponse>)DispatchTypeCache.ForInterface(handlerType).Handle(handler, request, cancellationToken);
+            var accessor = DispatchTypeCache.ForInterface(handlerType);
+            if (accessor.CanHandle != null && accessor.CanHandle(handler, request) is bool result && !result)
+            {
+                _logger?.LogInformation("Handler {Handler} cannot handle event {EventName}. Skipping.", handlerType.Name, request.GetType().Name);
+                return default;
+            }
+
+            var task = (Task<TResponse>)accessor.Handle(handler, request, cancellationToken);
 
             return await task.ConfigureAwait(false);
         }
