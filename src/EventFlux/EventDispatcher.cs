@@ -44,7 +44,7 @@ namespace EventFlux
         }
 
         /// <inheritdoc />
-        public async Task<TResponse> SendAsync<TResponse>(
+        public async Task<TResponse?> SendAsync<TResponse>(
            IEventRequest<TResponse> request,
            CancellationToken cancellationToken = default)
            where TResponse : IEventResponse
@@ -58,7 +58,7 @@ namespace EventFlux
             return await DispatchSendAsync(_serviceProvider, request, cancellationToken).ConfigureAwait(false);
         }
 
-        private async Task<TResponse> DispatchSendAsync<TResponse>(
+        private async Task<TResponse?> DispatchSendAsync<TResponse>(
             IServiceProvider serviceProvider,
             IEventRequest<TResponse> request,
             CancellationToken cancellationToken)

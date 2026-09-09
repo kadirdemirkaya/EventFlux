@@ -21,7 +21,7 @@ namespace EventFlux.Abstractions
         /// <typeparam name="TResponse">The type of the response.</typeparam>
         /// <param name="request">The request to send.</param>
         /// <param name="cancellationToken">Cancellation token to cancel execution.</param>
-        /// <returns>The response produced by the handler.</returns>
-        Task<TResponse> SendAsync<TResponse>(IEventRequest<TResponse> request, CancellationToken cancellationToken = default) where TResponse : IEventResponse;
+        /// <returns>The response produced by the handler, or <c>null</c> if the handler cannot handle the request.</returns>
+        Task<TResponse?> SendAsync<TResponse>(IEventRequest<TResponse> request, CancellationToken cancellationToken = default) where TResponse : IEventResponse;
     }
 }
