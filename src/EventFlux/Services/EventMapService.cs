@@ -1,3 +1,4 @@
+using System;
 using System.Reflection;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -69,20 +70,64 @@ namespace EventFlux
         }
 
         /// <summary>
-        /// Checks whether the event is mapped to a response.
+        /// Checks whether the specified event request type is mapped to a response type.
+        /// </summary>
+        /// <param name="eventRequestType">The event request type.</param>
+        /// <returns><c>true</c> if mapped; otherwise <c>false</c>.</returns>
+        public bool IsMap(Type eventRequestType)
+        {
+            if (eventRequestType == null)
+                return false;
+
+            return _internalEventMaps.ContainsKey(eventRequestType);
+        }
+
+        /// <summary>
+        /// Checks whether the event request type <typeparamref name="TEvent"/> is mapped to a response type.
+        /// </summary>
+        /// <typeparam name="TEvent">The event request type.</typeparam>
+        /// <returns><c>true</c> if mapped; otherwise <c>false</c>.</returns>
+        public bool IsMap<TEvent>() => IsMap(typeof(TEvent));
+
+        /// <summary>
+        /// Checks whether the event instance's type is mapped to a response.
         /// </summary>
         /// <typeparam name="TEvent">The event type.</typeparam>
         /// <param name="event">The event instance.</param>
         /// <returns><c>true</c> if mapped; otherwise <c>false</c>.</returns>
         public bool IsMap<TEvent>(TEvent? @event)
         {
+            var eventType = @event?.GetType() ?? typeof(TEvent);
+            if (_internalEventMaps.ContainsKey(eventType))
+                return true;
+
             var name = @event?.ToString();
-            Type? eventType = GetEventValue(name);
+            Type? fallbackType = GetEventValue(name);
 
-            if (eventType == null)
-                return false;
+            return fallbackType != null && _internalEventMaps.ContainsKey(fallbackType);
+        }
 
-            return _internalEventMaps.ContainsKey(eventType);
+        /// <summary>
+        /// Attempts to get the mapped response type for a given request type <typeparamref name="TEvent"/>.
+        /// </summary>
+        /// <typeparam name="TEvent">The request event type.</typeparam>
+        /// <param name="responseType">The resolved response type if found.</param>
+        /// <returns><c>true</c> if mapped; otherwise <c>false</c>.</returns>
+        public bool TryGetValue<TEvent>(out Type? responseType) => TryGetValue(typeof(TEvent), out responseType);
+
+        /// <summary>
+        /// Adds a mapping between an event request type and response type.
+        /// </summary>
+        /// <param name="eventRequestType">The request event type.</param>
+        /// <param name="responseType">The response event type.</param>
+        public void AddMap(Type eventRequestType, Type responseType)
+        {
+            if (eventRequestType == null)
+                throw new ArgumentNullException(nameof(eventRequestType));
+            if (responseType == null)
+                throw new ArgumentNullException(nameof(responseType));
+
+            _internalEventMaps.TryAdd(eventRequestType, responseType);
         }
 
         /// <summary>
@@ -109,14 +154,29 @@ namespace EventFlux
         public void AddMap<TEvent, TResponse>(TEvent? @event, TResponse response)
             where TResponse : class
         {
-            var name = @event?.ToString();
-            Type? eventRequest = GetEventValue(name);
-
-            if (eventRequest != null)
-            {
-                _internalEventMaps.TryAdd(eventRequest, typeof(TResponse));
-            }
+            var eventType = @event?.GetType() ?? typeof(TEvent);
+            _internalEventMaps.TryAdd(eventType, typeof(TResponse));
         }
+
+        /// <summary>
+        /// Removes the mapping for the given event request type.
+        /// </summary>
+        /// <param name="eventRequestType">The event request type to remove.</param>
+        /// <returns><c>true</c> if the element is successfully found and removed; otherwise, <c>false</c>.</returns>
+        public bool RemoveMap(Type eventRequestType)
+        {
+            if (eventRequestType == null)
+                return false;
+
+            return _internalEventMaps.TryRemove(eventRequestType, out _);
+        }
+
+        /// <summary>
+        /// Removes the mapping for the given event request type <typeparamref name="TEvent"/>.
+        /// </summary>
+        /// <typeparam name="TEvent">The event request type to remove.</typeparam>
+        /// <returns><c>true</c> if the element is successfully found and removed; otherwise, <c>false</c>.</returns>
+        public bool RemoveMap<TEvent>() => RemoveMap(typeof(TEvent));
 
         /// <summary>
         /// Removes the mapping for the given event type.
@@ -128,12 +188,15 @@ namespace EventFlux
         public void RemoveMap<TEvent, TResponse>(TEvent? @event, TResponse response)
             where TResponse : class
         {
-            var name = @event?.ToString();
-            Type? eventType = GetEventValue(name);
-
-            if (eventType != null)
+            var eventType = @event?.GetType() ?? typeof(TEvent);
+            if (!_internalEventMaps.TryRemove(eventType, out _))
             {
-                _internalEventMaps.TryRemove(eventType, out _);
+                var name = @event?.ToString();
+                Type? fallbackType = GetEventValue(name);
+                if (fallbackType != null)
+                {
+                    _internalEventMaps.TryRemove(fallbackType, out _);
+                }
             }
         }
 
@@ -143,6 +206,7 @@ namespace EventFlux
         /// <param name="event">The event type full name string.</param>
         /// <param name="responseType">The resolved response type if found.</param>
         /// <returns><c>true</c> if found; otherwise <c>false</c>.</returns>
+        [Obsolete("Use TryGetValue(Type, out Type?) or TryGetValue<TEvent>(out Type?) instead.")]
         public bool GetValue(string? @event, out Type? responseType)
         {
             if (string.IsNullOrEmpty(@event))

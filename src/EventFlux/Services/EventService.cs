@@ -102,16 +102,23 @@ namespace EventFlux.Services
         /// Gets the list of handler types registered for the specified event type.
         /// </summary>
         /// <param name="eventType">The event type.</param>
-        /// <returns>A list of handler types, or null if none registered.</returns>
+        /// <returns>A list of handler types registered for the event.</returns>
         public List<Type> GetHandlersForEvent(Type eventType)
         {
-            if (_internalEventHandlers.TryGetValue(eventType, out var inner))
+            if (eventType != null && _internalEventHandlers.TryGetValue(eventType, out var inner))
             {
                 return inner.Keys.ToList();
             }
 
-            return null;
+            return new List<Type>();
         }
+
+        /// <summary>
+        /// Gets the list of handler types registered for the specified event type.
+        /// </summary>
+        /// <typeparam name="TEvent">The event type.</typeparam>
+        /// <returns>A list of handler types registered for the event.</returns>
+        public List<Type> GetHandlersForEvent<TEvent>() => GetHandlersForEvent(typeof(TEvent));
 
         /// <summary>
         /// Subscribes a handler instance to an event.
