@@ -251,6 +251,10 @@ builder.Services.AddEventBus(options =>
     // Execution Strategy: Sequential (await each handler in order) or Parallel (Task.WhenAll)
     // Default is PublishStrategy.Parallel
     options.PublishStrategy = PublishStrategy.Sequential;
+
+    // Handler Lifetime: Transient, Scoped, or Singleton
+    // Default is ServiceLifetime.Transient
+    options.HandlerLifetime = ServiceLifetime.Scoped;
 }, typeof(Program).Assembly);
 
 builder.Services.AddEventDispatcher(options =>

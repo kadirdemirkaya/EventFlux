@@ -54,16 +54,19 @@ namespace EventFlux.Extensions
                 throw new ArgumentException("At least one valid assembly must be provided.", nameof(assemblies));
             }
 
+            EventFluxOptions options;
             if (configureOptions is not null)
             {
-                var options = new EventFluxOptions();
+                options = new EventFluxOptions();
                 configureOptions(options);
                 services.RemoveAll<EventFluxOptions>();
                 services.AddSingleton(options);
             }
             else
             {
-                services.TryAddSingleton<EventFluxOptions>();
+                var existingDescriptor = services.LastOrDefault(d => d.ServiceType == typeof(EventFluxOptions));
+                options = existingDescriptor?.ImplementationInstance as EventFluxOptions ?? new EventFluxOptions();
+                services.TryAddSingleton(options);
             }
 
             List<Type> handlers = new();
@@ -89,8 +92,7 @@ namespace EventFlux.Extensions
                 {
                     var requestInjectType = typeof(IEventHandler<,>).MakeGenericType(interfaceType.GenericTypeArguments);
 
-                    services.AddTransient(requestInjectType, handlerType);
-                    services.AddTransient(handlerType);
+                    services.Add(new ServiceDescriptor(requestInjectType, handlerType, options.HandlerLifetime));
 
                     var genericArgs = interfaceType.GetGenericArguments();
                     var requestType = genericArgs[0];
@@ -132,7 +134,7 @@ namespace EventFlux.Extensions
                 foreach (var interfaceType in interfaceTypes)
                 {
                     var requestInjectType = typeof(IEventHandler<>).MakeGenericType(interfaceType.GenericTypeArguments);
-                    services.TryAddEnumerable(ServiceDescriptor.Transient(requestInjectType, handlerType));
+                    services.TryAddEnumerable(new ServiceDescriptor(requestInjectType, handlerType, options.HandlerLifetime));
 
                     var genericArgs = interfaceType.GetGenericArguments();
                     var requestType = genericArgs[0];

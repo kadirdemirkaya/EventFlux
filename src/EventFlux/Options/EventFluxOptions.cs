@@ -1,3 +1,5 @@
+using Microsoft.Extensions.DependencyInjection;
+
 namespace EventFlux.Options
 {
     /// <summary>
@@ -18,5 +20,11 @@ namespace EventFlux.Options
         /// When <see cref="PublishStrategy.Sequential"/>, handlers run one after another in order of priority.
         /// </summary>
         public PublishStrategy PublishStrategy { get; set; } = PublishStrategy.Parallel;
+
+        /// <summary>
+        /// Gets or sets the lifetime used when registering event handlers.
+        /// Defaults to <see cref="ServiceLifetime.Transient"/>.
+        /// </summary>
+        public ServiceLifetime HandlerLifetime { get; set; } = ServiceLifetime.Transient;
     }
 }
