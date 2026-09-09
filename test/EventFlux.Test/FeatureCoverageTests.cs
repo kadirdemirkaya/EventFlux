@@ -244,6 +244,16 @@ namespace EventFlux.Test
         }
 
         [Fact]
+        public void Feature_EventStackService_ResolvableFromDI()
+        {
+            using var provider = BuildProvider();
+
+            var eventStackService = provider.GetService<EventStackService>();
+
+            Assert.NotNull(eventStackService);
+        }
+
+        [Fact]
         public void Feature_EventMapService_MapsRequestToResponse()
         {
             using var provider = BuildProvider();

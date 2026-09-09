@@ -19,7 +19,7 @@ namespace EventFlux
         private readonly ILogger<EventBus>? _logger;
         private readonly IServiceProvider? _serviceProvider;
         private readonly EventFluxOptions _options;
-        private readonly EventStackService _eventStackDictionaryService = new();
+        private readonly EventStackService _eventStackDictionaryService;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="EventBus"/> class.
@@ -27,6 +27,7 @@ namespace EventFlux
         public EventBus()
         {
             _options = new EventFluxOptions();
+            _eventStackDictionaryService = new EventStackService();
         }
 
         /// <summary>
@@ -46,10 +47,23 @@ namespace EventFlux
         /// <param name="logger">Logger instance.</param>
         /// <param name="options">Configuration options.</param>
         public EventBus(IServiceProvider serviceProvider, ILogger<EventBus> logger, EventFluxOptions? options)
+            : this(serviceProvider, logger, options, null)
+        {
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="EventBus"/> class with DI service provider, logger, options, and event stack service.
+        /// </summary>
+        /// <param name="serviceProvider">The service provider used to resolve handlers.</param>
+        /// <param name="logger">Logger instance.</param>
+        /// <param name="options">Configuration options.</param>
+        /// <param name="eventStackService">Event stack service for deferred batch events.</param>
+        public EventBus(IServiceProvider serviceProvider, ILogger<EventBus> logger, EventFluxOptions? options, EventStackService? eventStackService)
         {
             _logger = logger;
             _serviceProvider = serviceProvider;
             _options = options ?? serviceProvider?.GetService<EventFluxOptions>() ?? new EventFluxOptions();
+            _eventStackDictionaryService = eventStackService ?? serviceProvider?.GetService<EventStackService>() ?? new EventStackService();
         }
 
         /// <summary>
@@ -102,6 +116,22 @@ namespace EventFlux
         /// <param name="options">Configuration options.</param>
         public EventBus(IServiceProvider serviceProvider, IEnumerable<Assembly> assemblies, EventService dictionaryService, EventMapService eventDictionaryMapService, IEnumerable<Type> handlers, ILogger<EventBus> logger, EventFluxOptions? options)
             : this(serviceProvider, logger, options)
+        {
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="EventBus"/> class with full parameters including event stack service.
+        /// </summary>
+        /// <param name="serviceProvider">The service provider used to resolve handlers.</param>
+        /// <param name="assemblies">Assemblies containing handlers.</param>
+        /// <param name="dictionaryService">Event service registry.</param>
+        /// <param name="eventDictionaryMapService">Event map service registry.</param>
+        /// <param name="handlers">Handler types list.</param>
+        /// <param name="logger">Logger instance.</param>
+        /// <param name="options">Configuration options.</param>
+        /// <param name="eventStackService">Event stack service for deferred batch events.</param>
+        public EventBus(IServiceProvider serviceProvider, IEnumerable<Assembly> assemblies, EventService dictionaryService, EventMapService eventDictionaryMapService, IEnumerable<Type> handlers, ILogger<EventBus> logger, EventFluxOptions? options, EventStackService? eventStackService)
+            : this(serviceProvider, logger, options, eventStackService)
         {
         }
 

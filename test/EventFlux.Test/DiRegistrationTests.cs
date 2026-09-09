@@ -1,6 +1,7 @@
 using EventFlux.Abstractions;
 using EventFlux.Behaviors;
 using EventFlux.Extensions;
+using EventFlux.Services;
 using Microsoft.Extensions.DependencyInjection;
 using System.Reflection;
 
@@ -97,6 +98,21 @@ namespace EventFlux.Test
             // Assert
             var count = services.Count(d => d.ServiceType == typeof(IEventDispatcher));
             Assert.Equal(1, count);
+        }
+
+        [Fact]
+        public void AddEventBus_RegistersEventStackServiceAsSingleton()
+        {
+            // Arrange
+            var services = new ServiceCollection();
+
+            // Act
+            services.AddEventBus(typeof(DiRegistrationTests).Assembly);
+
+            // Assert
+            var descriptor = services.FirstOrDefault(d => d.ServiceType == typeof(EventStackService));
+            Assert.NotNull(descriptor);
+            Assert.Equal(ServiceLifetime.Singleton, descriptor.Lifetime);
         }
     }
 }
