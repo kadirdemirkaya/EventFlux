@@ -13,10 +13,14 @@ EventFlux is a lightweight, high-performance in-memory event dispatching and CQR
 - **Blazing Fast**: Compiled expression tree delegate caching with minimal dispatch overhead (~81 ns).
 - **Request / Response**: Send a command or query to a single handler and receive a response via `SendAsync`.
 - **Publish / Subscribe**: Broadcast notification events to multiple handlers via `PublishAsync`.
+- **Execution Strategies**: Run notification handlers concurrently (`Parallel`) or in guaranteed order (`Sequential`) via `PublishStrategy`.
+- **Cancellation Aware**: First-class `CancellationToken` propagation across dispatchers, pipelines, and handlers.
+- **Ambient Scope Support**: Seamlessly share the caller's DI scope (EF Core `DbContext`, Unit of Work) via `EventFluxOptions`.
+- **Configurable Lifetime**: Register handlers as `Transient`, `Scoped`, or `Singleton` per application needs.
 - **Pipeline Behaviors**: Intercept requests with cross-cutting concerns (validation, logging, caching) using `IEventCustomPipeline`.
 - **Handler Ordering**: Control execution sequence for multi-handler events with `[HandlerOrder(priority)]`.
-- **Precondition Evaluation**: Selectively gate handler execution with the `CanHandle` method.
-- **Deferred Batch Dispatch**: Queue events and dispatch them together via `AddStackRequestEvent` and `StackEventDispatcherAsync`.
+- **Precondition Evaluation**: Selectively gate handler execution across both `SendAsync` and `PublishAsync` with `CanHandle`.
+- **Deferred Batch Dispatch**: Queue events and dispatch them across scopes via `EventStackService` and `StackEventDispatcherAsync`.
 - **Multi-Targeting**: Supports .NET 6.0, 7.0, 8.0, and 9.0 with SourceLink and symbol debugging (`.snupkg`) enabled.
 
 ---
@@ -27,12 +31,12 @@ EventFlux is a lightweight, high-performance in-memory event dispatching and CQR
 
 Package Manager Console:
 ```powershell
-dotnet add package EventFlux --version 1.4.1
+dotnet add package EventFlux --version 1.5.0
 ```
 
 Or via `<PackageReference>` in your `.csproj`:
 ```xml
-<PackageReference Include="EventFlux" Version="1.4.1" />
+<PackageReference Include="EventFlux" Version="1.5.0" />
 ```
 
 ### 2. Register Services
@@ -101,7 +105,7 @@ public class UserController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> CreateUser([FromBody] CreateUserCommand command, CancellationToken ct)
     {
-        CreateUserResponse response = await _eventBus.SendAsync(command, ct);
+        CreateUserResponse? response = await _eventBus.SendAsync(command, ct);
         return Ok(response);
     }
 }
@@ -191,7 +195,7 @@ public class SendWelcomeEmailHandler : IEventHandler<UserCreatedNotification>
 
 ### 3. Conditional Handling (`CanHandle`)
 
-Notification handlers can selectively filter events before processing:
+Handlers can selectively filter events before processing across both `PublishAsync` and `SendAsync`. If `CanHandle` evaluates to `false`, execution is skipped (for `SendAsync`, `null` is returned):
 
 ```csharp
 public record OrderNotification(decimal TotalAmount) : IEventRequest;
