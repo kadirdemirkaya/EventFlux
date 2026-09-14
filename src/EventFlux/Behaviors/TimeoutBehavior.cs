@@ -33,22 +33,12 @@ namespace EventFlux.Behaviors
 
             try
             {
-                var task = next(linkedCts.Token);
-                var completedTask = await Task.WhenAny(task, Task.Delay(Timeout.Infinite, linkedCts.Token)).ConfigureAwait(false);
-
-                if (completedTask != task)
-                {
-                    _logger.LogWarning("[Timeout] Event processing exceeded the allowed time limit.");
-                    throw new OperationCanceledException("Timeout occurred");
-                }
-
-                await task.ConfigureAwait(false);
+                await next(linkedCts.Token).WaitAsync(linkedCts.Token).ConfigureAwait(false);
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException) when (linkedCts.IsCancellationRequested)
             {
-                if (timeoutCts.IsCancellationRequested)
-                    _logger.LogWarning("[Timeout] Event processing exceeded the allowed time limit.");
-                throw;
+                _logger.LogWarning("[Timeout] Event processing exceeded the allowed time limit.");
+                throw new OperationCanceledException("Timeout occurred");
             }
         }
     }
@@ -89,25 +79,12 @@ namespace EventFlux.Behaviors
 
             try
             {
-                var task = next(linkedCts.Token);
-
-                var timeoutTask = Task.Delay(Timeout.Infinite, linkedCts.Token);
-
-                var completedTask = await Task.WhenAny(task, timeoutTask).ConfigureAwait(false);
-
-                if (completedTask == timeoutTask)
-                {
-                    _logger.LogWarning("[Timeout] Event processing exceeded the allowed time limit.");
-                    linkedCts.Cancel();
-                    throw new OperationCanceledException("Timeout occurred");
-                }
-
-                return await task.ConfigureAwait(false);
+                return await next(linkedCts.Token).WaitAsync(linkedCts.Token).ConfigureAwait(false);
             }
-            catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested)
+            catch (OperationCanceledException) when (linkedCts.IsCancellationRequested)
             {
                 _logger.LogWarning("[Timeout] Event processing exceeded the allowed time limit.");
-                throw;
+                throw new OperationCanceledException("Timeout occurred");
             }
         }
     }
