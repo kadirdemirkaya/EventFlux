@@ -20,7 +20,7 @@ namespace EventFlux.Services
         /// </summary>
         public EventMapService()
         {
-            _assemblies = null;
+            _assemblies = Array.Empty<Assembly>();
             _internalEventMaps = new ConcurrentDictionary<Type, Type>();
         }
 
@@ -28,9 +28,9 @@ namespace EventFlux.Services
         /// Initializes a new instance of the <see cref="EventMapService"/> class with assemblies.
         /// </summary>
         /// <param name="assemblies">Assemblies containing event maps.</param>
-        public EventMapService(IEnumerable<Assembly> assemblies)
+        public EventMapService(IEnumerable<Assembly>? assemblies)
         {
-            _assemblies = assemblies;
+            _assemblies = assemblies ?? Array.Empty<Assembly>();
             _internalEventMaps = new ConcurrentDictionary<Type, Type>();
         }
 
@@ -39,9 +39,9 @@ namespace EventFlux.Services
         /// </summary>
         /// <param name="assemblies">Assemblies containing event maps.</param>
         /// <param name="internalEventMaps">Initial map of request types to response types.</param>
-        public EventMapService(IEnumerable<Assembly> assemblies, Dictionary<Type, Type> internalEventMaps)
+        public EventMapService(IEnumerable<Assembly>? assemblies, Dictionary<Type, Type>? internalEventMaps)
         {
-            _assemblies = assemblies;
+            _assemblies = assemblies ?? Array.Empty<Assembly>();
             _internalEventMaps = internalEventMaps != null
                 ? new ConcurrentDictionary<Type, Type>(internalEventMaps)
                 : new ConcurrentDictionary<Type, Type>();
