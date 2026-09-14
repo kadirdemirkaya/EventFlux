@@ -58,8 +58,10 @@ namespace EventFlux.Test
             EventHandlerDelegate next = _ => Task.Delay(HandlerWork, CancellationToken.None);
 
             // Act & Assert
-            await Assert.ThrowsAsync<OperationCanceledException>(
+            var ex = await Assert.ThrowsAsync<OperationCanceledException>(
                 () => behavior.Handle(new PublishEventRequest(), next, CancellationToken.None));
+
+            Assert.Equal("Timeout occurred", ex.Message);
         }
 
         [Fact]
@@ -74,8 +76,10 @@ namespace EventFlux.Test
             };
 
             // Act & Assert
-            await Assert.ThrowsAsync<OperationCanceledException>(
+            var ex = await Assert.ThrowsAsync<OperationCanceledException>(
                 () => behavior.Handle(new SendEventRequest(), next, CancellationToken.None));
+
+            Assert.Equal("Timeout occurred", ex.Message);
         }
 
         [Fact]
@@ -92,10 +96,11 @@ namespace EventFlux.Test
             };
 
             // Act
-            await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            var ex = await Assert.ThrowsAnyAsync<OperationCanceledException>(
                 () => behavior.Handle(new SendEventRequest(), next, CancellationToken.None));
 
             // Assert
+            Assert.Equal("Timeout occurred", ex.Message);
             Assert.True(observedToken.CanBeCanceled);
             Assert.True(observedToken.IsCancellationRequested);
         }
@@ -113,8 +118,47 @@ namespace EventFlux.Test
             };
 
             // Act & Assert
-            await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            var ex = await Assert.ThrowsAnyAsync<OperationCanceledException>(
                 () => behavior.Handle(new SendEventRequest(), next, cts.Token));
+
+            Assert.NotEqual("Timeout occurred", ex.Message);
+            Assert.Equal(cts.Token, ex.CancellationToken);
+        }
+
+        [Fact]
+        public async Task Handle_Notification_WhenCallerCancels_ThrowsOperationCanceledException()
+        {
+            // Arrange
+            var behavior = CreateNotificationBehavior(timeoutSeconds: 30);
+            using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(100));
+            EventHandlerDelegate next = async ct =>
+            {
+                await Task.Delay(HandlerWork, ct);
+            };
+
+            // Act & Assert
+            var ex = await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                () => behavior.Handle(new PublishEventRequest(), next, cts.Token));
+
+            Assert.NotEqual("Timeout occurred", ex.Message);
+            Assert.Equal(cts.Token, ex.CancellationToken);
+        }
+
+        [Fact]
+        public async Task Handle_Request_WhenHandlerCancelsItself_PropagatesOriginalCancellation()
+        {
+            // Arrange
+            var behavior = CreateRequestBehavior(timeoutSeconds: 30);
+            using var innerCts = new CancellationTokenSource();
+            innerCts.Cancel();
+            EventHandlerDelegate<SendEventResponse> next = _ => throw new OperationCanceledException(innerCts.Token);
+
+            // Act & Assert
+            var ex = await Assert.ThrowsAsync<OperationCanceledException>(
+                () => behavior.Handle(new SendEventRequest(), next, CancellationToken.None));
+
+            Assert.NotEqual("Timeout occurred", ex.Message);
+            Assert.Equal(innerCts.Token, ex.CancellationToken);
         }
 
         [Fact]
