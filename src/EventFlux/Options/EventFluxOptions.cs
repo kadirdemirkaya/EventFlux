@@ -16,7 +16,7 @@ namespace EventFlux.Options
 
         /// <summary>
         /// Gets or sets the execution strategy for notification handlers during publish operations.
-        /// When <see cref="PublishStrategy.Parallel"/> (default), handlers run concurrently via <see cref="System.Threading.Tasks.Task.WhenAll"/>.
+        /// When <see cref="PublishStrategy.Parallel"/> (default), handlers run concurrently via <see cref="System.Threading.Tasks.Task.WhenAll(System.Collections.Generic.IEnumerable{System.Threading.Tasks.Task})"/>.
         /// When <see cref="PublishStrategy.Sequential"/>, handlers run one after another in order of priority.
         /// </summary>
         public PublishStrategy PublishStrategy { get; set; } = PublishStrategy.Parallel;
