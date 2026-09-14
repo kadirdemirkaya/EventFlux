@@ -31,12 +31,12 @@ EventFlux is a lightweight, high-performance in-memory event dispatching and CQR
 
 Package Manager Console:
 ```powershell
-dotnet add package EventFlux --version 1.5.1
+dotnet add package EventFlux --version 2.0.0
 ```
 
 Or via `<PackageReference>` in your `.csproj`:
 ```xml
-<PackageReference Include="EventFlux" Version="1.5.1" />
+<PackageReference Include="EventFlux" Version="2.0.0" />
 ```
 
 ### 2. Register Services
@@ -301,8 +301,21 @@ public class ProcessPaymentHandler : IEventHandler<ProcessPaymentCommand, Paymen
 }
 ```
 
-> **Backward Compatibility:**
-> Existing handlers implementing `Handle(request)` continue to work without any changes. Implementing the `CancellationToken` parameter is completely opt-in via C# default interface methods.
+> **v2.0 Note:**
+> In v2.0+, `CancellationToken` is a mandatory parameter on `IEventHandler.Handle`. Add `CancellationToken cancellationToken = default` to all handler implementations when upgrading from v1.x.
+
+---
+
+## Upgrading to v2.0
+
+v2.0 contains the following breaking changes:
+
+| Change | Migration |
+|---|---|
+| Dropped `net6.0` / `net7.0` targets | Upgrade your project to `net8.0` or later |
+| `IEventHandler.Handle` now requires `CancellationToken` | Add `CancellationToken cancellationToken = default` parameter to all handler implementations |
+| `EventMapService` moved to `EventFlux.Services` namespace | Update `using` directives from `using EventFlux;` to `using EventFlux.Services;` where referencing `EventMapService` directly |
+| `CreateScopePerEvent` defaults to `false` | If you relied on isolated child scopes, explicitly set `options.CreateScopePerEvent = true` |
 
 ---
 

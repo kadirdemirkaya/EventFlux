@@ -7,28 +7,27 @@
 		<Nullable>enable</Nullable>
 		<GeneratePackageOnBuild>true</GeneratePackageOnBuild>
 		<PackageId>EventFlux</PackageId>
-		<Version>1.5.1</Version>
+		<Version>2.0.0</Version>
 		<Authors>Kadir Demirkaya</Authors>
-		<Copyright>Copyright (c) 2025 Kadir Demirkaya</Copyright>
+		<Copyright>Copyright (c) 2025-2026 Kadir Demirkaya</Copyright>
 		<PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
 		<Description>A lightweight event-based CQRS implementation for .NET applications.</Description>
 		<PackageProjectUrl>https://github.com/kadirdemirkaya/EventFlux</PackageProjectUrl>
 		<RepositoryUrl>https://github.com/kadirdemirkaya/EventFlux</RepositoryUrl>
 		<RepositoryType>git</RepositoryType>
 		<PackageTags>CQRS EventBus EventSourcing .NET</PackageTags>
-		<AssemblyInformationalVersion>1.5.1</AssemblyInformationalVersion>
+		<AssemblyInformationalVersion>2.0.0</AssemblyInformationalVersion>
 		<PackageReadmeFile>README.md</PackageReadmeFile>
 		<PackageReleaseNotes>
-			v1.5.1:
-			- Packaged complete Release binaries for all Phase 2 features and performance enhancements
-			- Added EventFluxOptions configuration for ambient scope (CreateScopePerEvent = false)
-			- Added PublishStrategy option (Parallel and Sequential execution)
-			- Added CancellationToken overload on IEventHandler via default interface methods
-			- Registered EventStackService as DI singleton for cross-scope deferred batch dispatch
-			- Added HandlerLifetime option (Transient, Scoped, Singleton) and cleaned up concrete DI registrations
-			- Hardened EventService and EventMapService with type-safe lookups and C# record support
-			- Added duplicate request handler detection guard during AddEventBus registration
-			- Aligned CanHandle behavior across SendAsync and updated nullable return contract to Task&lt;TResponse?&gt;
+			v2.0.0 — Breaking Changes and Modernization:
+			- BREAKING: Dropped net6.0 and net7.0 target frameworks; now targeting net8.0, net9.0, and net10.0
+			- BREAKING: IEventHandler.Handle now requires CancellationToken as mandatory parameter (no longer optional overload)
+			- BREAKING: EventMapService moved from EventFlux namespace to EventFlux.Services namespace
+			- BREAKING: CreateScopePerEvent default changed from true to false (ambient scope by default)
+			- Modernized TimeoutBehavior to use WaitAsync for reliable cancellation on all supported TFMs
+			- Distinguished caller cancellation from timeout in TimeoutBehavior (no longer logs false timeout warnings)
+			- Hot-path LINQ and allocation optimizations (Span-based, array-backed, allocation-free dispatch)
+			- Eliminated all nullable warnings and fixed NullReferenceException in parameterless EventService/EventMapService constructors
 		</PackageReleaseNotes>
 		<PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
 		<GenerateDocumentationFile>true</GenerateDocumentationFile>
