@@ -265,5 +265,49 @@ namespace EventFlux.Test
             Assert.False(nullLookup);
             Assert.Null(nullType);
         }
+
+        [Fact]
+        public void EventService_ParameterlessCtor_FindEventHandlers_DoesNotThrow_AndResultsInEmptyHandlers()
+        {
+            var eventService = new EventService();
+
+            var exception = Record.Exception(() => eventService.FindEventHandlers());
+
+            Assert.Null(exception);
+            Assert.Empty(eventService.InternalEventHandlers);
+        }
+
+        [Fact]
+        public void EventService_NullAssembliesCtor_FindEventHandlers_DoesNotThrow_AndResultsInEmptyHandlers()
+        {
+            var eventService = new EventService(null);
+
+            var exception = Record.Exception(() => eventService.FindEventHandlers());
+
+            Assert.Null(exception);
+            Assert.Empty(eventService.InternalEventHandlers);
+        }
+
+        [Fact]
+        public void EventMapService_ParameterlessCtor_FindEvents_DoesNotThrow_AndResultsInEmptyMaps()
+        {
+            var mapService = new EventMapService();
+
+            var exception = Record.Exception(() => mapService.FindEvents());
+
+            Assert.Null(exception);
+            Assert.Empty(mapService.InternalEventMaps);
+        }
+
+        [Fact]
+        public void EventMapService_NullAssembliesCtor_FindEvents_DoesNotThrow_AndResultsInEmptyMaps()
+        {
+            var mapService = new EventMapService(null);
+
+            var exception = Record.Exception(() => mapService.FindEvents());
+
+            Assert.Null(exception);
+            Assert.Empty(mapService.InternalEventMaps);
+        }
     }
 }
