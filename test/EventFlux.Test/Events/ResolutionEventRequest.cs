@@ -12,7 +12,7 @@ namespace EventFlux.Test.Events
     {
         public static int HandledCount;
 
-        public Task Handle(ResolutionEventRequest request)
+        public Task Handle(ResolutionEventRequest request, CancellationToken cancellationToken = default)
         {
             Interlocked.Increment(ref HandledCount);
 
@@ -29,7 +29,7 @@ namespace EventFlux.Test.Events
     {
         public static int HandledCount;
 
-        public Task Handle(OrderedResolutionEventRequest request)
+        public Task Handle(OrderedResolutionEventRequest request, CancellationToken cancellationToken = default)
         {
             Interlocked.Increment(ref HandledCount);
 
@@ -42,7 +42,7 @@ namespace EventFlux.Test.Events
     {
         public static int HandledCount;
 
-        public Task Handle(OrderedResolutionEventRequest request)
+        public Task Handle(OrderedResolutionEventRequest request, CancellationToken cancellationToken = default)
         {
             Interlocked.Increment(ref HandledCount);
 
@@ -61,7 +61,7 @@ namespace EventFlux.Test.Events
 
         public bool CanHandle(GatedResolutionEventRequest @event) => @event.Allow;
 
-        public Task Handle(GatedResolutionEventRequest request)
+        public Task Handle(GatedResolutionEventRequest request, CancellationToken cancellationToken = default)
         {
             Interlocked.Increment(ref HandledCount);
 

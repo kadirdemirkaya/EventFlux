@@ -76,7 +76,7 @@ using EventFlux.Abstractions;
 public record CreateUserCommand(string Username, string Email) : IEventRequest<CreateUserResponse>;
 public record CreateUserResponse(Guid UserId, bool Success) : IEventResponse;
 
-// Define handler (CancellationToken is optional via default interface method)
+// Define handler (CancellationToken is mandatory on IEventHandler in v2.0+)
 public class CreateUserHandler : IEventHandler<CreateUserCommand, CreateUserResponse>
 {
     public Task<CreateUserResponse> Handle(CreateUserCommand request, CancellationToken cancellationToken = default)

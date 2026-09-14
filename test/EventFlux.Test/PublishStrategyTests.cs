@@ -37,10 +37,10 @@ namespace EventFlux.Test
                 _tracker = tracker;
             }
 
-            public async Task Handle(OrderedStrategyEvent @event)
+            public async Task Handle(OrderedStrategyEvent @event, CancellationToken cancellationToken = default)
             {
                 _tracker.Record("SlowStart");
-                await Task.Delay(60).ConfigureAwait(false);
+                await Task.Delay(60, cancellationToken).ConfigureAwait(false);
                 _tracker.Record("SlowEnd");
             }
         }
@@ -55,10 +55,10 @@ namespace EventFlux.Test
                 _tracker = tracker;
             }
 
-            public async Task Handle(OrderedStrategyEvent @event)
+            public async Task Handle(OrderedStrategyEvent @event, CancellationToken cancellationToken = default)
             {
                 _tracker.Record("FastStart");
-                await Task.Delay(10).ConfigureAwait(false);
+                await Task.Delay(10, cancellationToken).ConfigureAwait(false);
                 _tracker.Record("FastEnd");
             }
         }
@@ -75,7 +75,7 @@ namespace EventFlux.Test
 
             public bool CanHandle(OrderedStrategyEvent @event) => @event.Id != "skip-conditional";
 
-            public Task Handle(OrderedStrategyEvent @event)
+            public Task Handle(OrderedStrategyEvent @event, CancellationToken cancellationToken = default)
             {
                 _tracker.Record("Conditional");
                 return Task.CompletedTask;

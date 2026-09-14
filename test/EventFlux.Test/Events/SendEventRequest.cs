@@ -1,4 +1,4 @@
-﻿
+
 
 using EventFlux.Abstractions;
 
@@ -16,7 +16,7 @@ namespace EventFlux.Test.Events
 
     public class SendEventHandler : IEventHandler<SendEventRequest, SendEventResponse>
     {
-        public async Task<SendEventResponse> Handle(SendEventRequest @event)
+        public async Task<SendEventResponse> Handle(SendEventRequest @event, CancellationToken cancellationToken = default)
         {
             return new SendEventResponse { Data = @event.Data };
         }

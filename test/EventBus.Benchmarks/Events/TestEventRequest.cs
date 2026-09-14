@@ -1,4 +1,4 @@
-﻿using EventFlux.Abstractions;
+using EventFlux.Abstractions;
 
 namespace EventBus.Benchmarks.Events
 {
@@ -14,9 +14,9 @@ namespace EventBus.Benchmarks.Events
 
     public class TestEventHandler : IEventHandler<TestEventRequest, TestEventResponse>
     {
-        public async Task<TestEventResponse> Handle(TestEventRequest request)
+        public async Task<TestEventResponse> Handle(TestEventRequest request, CancellationToken cancellationToken = default)
         {
-            await Task.Delay(50); // Simulate work
+            await Task.Delay(50, cancellationToken); // Simulate work
             return new TestEventResponse
             {
                 ABS = $"Processed at {request.DateTime}"

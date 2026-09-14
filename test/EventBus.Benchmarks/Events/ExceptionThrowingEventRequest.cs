@@ -1,4 +1,4 @@
-﻿using EventFlux.Abstractions;
+using EventFlux.Abstractions;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -13,9 +13,9 @@ namespace EventBus.Benchmarks.Events
 
     public class ExceptionThrowingHandler : IEventHandler<ExceptionThrowingEventRequest>
     {
-        public async Task Handle(ExceptionThrowingEventRequest request)
+        public async Task Handle(ExceptionThrowingEventRequest request, CancellationToken cancellationToken = default)
         {
-            await Task.Delay(50);
+            await Task.Delay(50, cancellationToken);
             Console.WriteLine("ExceptionThrowingHandler: About to throw exception...");
             throw new InvalidOperationException("Simulated handler exception");
         }

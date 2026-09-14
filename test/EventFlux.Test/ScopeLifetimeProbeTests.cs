@@ -34,7 +34,7 @@ namespace EventFlux.Test
 
         public ScopeProbeEventHandler(TrackedScopedService tracked) => _tracked = tracked;
 
-        public Task Handle(ScopeProbeEventRequest request)
+        public Task Handle(ScopeProbeEventRequest request, CancellationToken cancellationToken = default)
         {
             lock (TrackedScopedService.SeenByHandler)
                 TrackedScopedService.SeenByHandler.Add(_tracked.Id);

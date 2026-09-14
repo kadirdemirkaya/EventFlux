@@ -55,140 +55,140 @@ namespace EventFlux.Test
         public class StabilityHandler00 : StabilityHandlerBase, IEventHandler<StabilityEvent>
         {
             public StabilityHandler00(StabilityTracker tracker) : base(tracker) { }
-            public Task Handle(StabilityEvent @event) => RecordAsync();
+            public Task Handle(StabilityEvent @event, CancellationToken cancellationToken = default) => RecordAsync();
         }
 
         [HandlerOrder(1)]
         public class StabilityHandler01 : StabilityHandlerBase, IEventHandler<StabilityEvent>
         {
             public StabilityHandler01(StabilityTracker tracker) : base(tracker) { }
-            public Task Handle(StabilityEvent @event) => RecordAsync();
+            public Task Handle(StabilityEvent @event, CancellationToken cancellationToken = default) => RecordAsync();
         }
 
         [HandlerOrder(0)]
         public class StabilityHandler02 : StabilityHandlerBase, IEventHandler<StabilityEvent>
         {
             public StabilityHandler02(StabilityTracker tracker) : base(tracker) { }
-            public Task Handle(StabilityEvent @event) => RecordAsync();
+            public Task Handle(StabilityEvent @event, CancellationToken cancellationToken = default) => RecordAsync();
         }
 
         [HandlerOrder(1)]
         public class StabilityHandler03 : StabilityHandlerBase, IEventHandler<StabilityEvent>
         {
             public StabilityHandler03(StabilityTracker tracker) : base(tracker) { }
-            public Task Handle(StabilityEvent @event) => RecordAsync();
+            public Task Handle(StabilityEvent @event, CancellationToken cancellationToken = default) => RecordAsync();
         }
 
         [HandlerOrder(0)]
         public class StabilityHandler04 : StabilityHandlerBase, IEventHandler<StabilityEvent>
         {
             public StabilityHandler04(StabilityTracker tracker) : base(tracker) { }
-            public Task Handle(StabilityEvent @event) => RecordAsync();
+            public Task Handle(StabilityEvent @event, CancellationToken cancellationToken = default) => RecordAsync();
         }
 
         [HandlerOrder(1)]
         public class StabilityHandler05 : StabilityHandlerBase, IEventHandler<StabilityEvent>
         {
             public StabilityHandler05(StabilityTracker tracker) : base(tracker) { }
-            public Task Handle(StabilityEvent @event) => RecordAsync();
+            public Task Handle(StabilityEvent @event, CancellationToken cancellationToken = default) => RecordAsync();
         }
 
         [HandlerOrder(0)]
         public class StabilityHandler06 : StabilityHandlerBase, IEventHandler<StabilityEvent>
         {
             public StabilityHandler06(StabilityTracker tracker) : base(tracker) { }
-            public Task Handle(StabilityEvent @event) => RecordAsync();
+            public Task Handle(StabilityEvent @event, CancellationToken cancellationToken = default) => RecordAsync();
         }
 
         [HandlerOrder(1)]
         public class StabilityHandler07 : StabilityHandlerBase, IEventHandler<StabilityEvent>
         {
             public StabilityHandler07(StabilityTracker tracker) : base(tracker) { }
-            public Task Handle(StabilityEvent @event) => RecordAsync();
+            public Task Handle(StabilityEvent @event, CancellationToken cancellationToken = default) => RecordAsync();
         }
 
         [HandlerOrder(0)]
         public class StabilityHandler08 : StabilityHandlerBase, IEventHandler<StabilityEvent>
         {
             public StabilityHandler08(StabilityTracker tracker) : base(tracker) { }
-            public Task Handle(StabilityEvent @event) => RecordAsync();
+            public Task Handle(StabilityEvent @event, CancellationToken cancellationToken = default) => RecordAsync();
         }
 
         [HandlerOrder(1)]
         public class StabilityHandler09 : StabilityHandlerBase, IEventHandler<StabilityEvent>
         {
             public StabilityHandler09(StabilityTracker tracker) : base(tracker) { }
-            public Task Handle(StabilityEvent @event) => RecordAsync();
+            public Task Handle(StabilityEvent @event, CancellationToken cancellationToken = default) => RecordAsync();
         }
 
         [HandlerOrder(0)]
         public class StabilityHandler10 : StabilityHandlerBase, IEventHandler<StabilityEvent>
         {
             public StabilityHandler10(StabilityTracker tracker) : base(tracker) { }
-            public Task Handle(StabilityEvent @event) => RecordAsync();
+            public Task Handle(StabilityEvent @event, CancellationToken cancellationToken = default) => RecordAsync();
         }
 
         [HandlerOrder(1)]
         public class StabilityHandler11 : StabilityHandlerBase, IEventHandler<StabilityEvent>
         {
             public StabilityHandler11(StabilityTracker tracker) : base(tracker) { }
-            public Task Handle(StabilityEvent @event) => RecordAsync();
+            public Task Handle(StabilityEvent @event, CancellationToken cancellationToken = default) => RecordAsync();
         }
 
         [HandlerOrder(0)]
         public class StabilityHandler12 : StabilityHandlerBase, IEventHandler<StabilityEvent>
         {
             public StabilityHandler12(StabilityTracker tracker) : base(tracker) { }
-            public Task Handle(StabilityEvent @event) => RecordAsync();
+            public Task Handle(StabilityEvent @event, CancellationToken cancellationToken = default) => RecordAsync();
         }
 
         [HandlerOrder(1)]
         public class StabilityHandler13 : StabilityHandlerBase, IEventHandler<StabilityEvent>
         {
             public StabilityHandler13(StabilityTracker tracker) : base(tracker) { }
-            public Task Handle(StabilityEvent @event) => RecordAsync();
+            public Task Handle(StabilityEvent @event, CancellationToken cancellationToken = default) => RecordAsync();
         }
 
         [HandlerOrder(0)]
         public class StabilityHandler14 : StabilityHandlerBase, IEventHandler<StabilityEvent>
         {
             public StabilityHandler14(StabilityTracker tracker) : base(tracker) { }
-            public Task Handle(StabilityEvent @event) => RecordAsync();
+            public Task Handle(StabilityEvent @event, CancellationToken cancellationToken = default) => RecordAsync();
         }
 
         [HandlerOrder(1)]
         public class StabilityHandler15 : StabilityHandlerBase, IEventHandler<StabilityEvent>
         {
             public StabilityHandler15(StabilityTracker tracker) : base(tracker) { }
-            public Task Handle(StabilityEvent @event) => RecordAsync();
+            public Task Handle(StabilityEvent @event, CancellationToken cancellationToken = default) => RecordAsync();
         }
 
         [HandlerOrder(0)]
         public class StabilityHandler16 : StabilityHandlerBase, IEventHandler<StabilityEvent>
         {
             public StabilityHandler16(StabilityTracker tracker) : base(tracker) { }
-            public Task Handle(StabilityEvent @event) => RecordAsync();
+            public Task Handle(StabilityEvent @event, CancellationToken cancellationToken = default) => RecordAsync();
         }
 
         [HandlerOrder(1)]
         public class StabilityHandler17 : StabilityHandlerBase, IEventHandler<StabilityEvent>
         {
             public StabilityHandler17(StabilityTracker tracker) : base(tracker) { }
-            public Task Handle(StabilityEvent @event) => RecordAsync();
+            public Task Handle(StabilityEvent @event, CancellationToken cancellationToken = default) => RecordAsync();
         }
 
         [HandlerOrder(0)]
         public class StabilityHandler18 : StabilityHandlerBase, IEventHandler<StabilityEvent>
         {
             public StabilityHandler18(StabilityTracker tracker) : base(tracker) { }
-            public Task Handle(StabilityEvent @event) => RecordAsync();
+            public Task Handle(StabilityEvent @event, CancellationToken cancellationToken = default) => RecordAsync();
         }
 
         [HandlerOrder(1)]
         public class StabilityHandler19 : StabilityHandlerBase, IEventHandler<StabilityEvent>
         {
             public StabilityHandler19(StabilityTracker tracker) : base(tracker) { }
-            public Task Handle(StabilityEvent @event) => RecordAsync();
+            public Task Handle(StabilityEvent @event, CancellationToken cancellationToken = default) => RecordAsync();
         }
 
         private static ServiceProvider CreateProvider(StabilityTracker tracker)

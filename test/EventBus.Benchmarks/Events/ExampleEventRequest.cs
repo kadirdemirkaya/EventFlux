@@ -1,4 +1,4 @@
-﻿using EventFlux.Abstractions;
+using EventFlux.Abstractions;
 
 namespace EventBus.Benchmarks.Events
 {
@@ -14,9 +14,9 @@ namespace EventBus.Benchmarks.Events
 
     public class ExampleEventHandler : IEventHandler<ExampleEventRequest, ExampleEventResponse>
     {
-        public async Task<ExampleEventResponse> Handle(ExampleEventRequest request)
+        public async Task<ExampleEventResponse> Handle(ExampleEventRequest request, CancellationToken cancellationToken = default)
         {
-            await Task.Delay(50);
+            await Task.Delay(50, cancellationToken);
             return new ExampleEventResponse
             {
                 Result = request.Num * 2

@@ -101,7 +101,7 @@ namespace EventFlux.Test
                 "Handle",
                 MethodAttributes.Public | MethodAttributes.Virtual,
                 typeof(Task<>).MakeGenericType(responseType),
-                new[] { requestType });
+                new[] { requestType, typeof(CancellationToken) });
             var il1 = handleMethod1.GetILGenerator();
             il1.Emit(OpCodes.Ldnull);
             il1.Emit(OpCodes.Ret);
@@ -115,7 +115,7 @@ namespace EventFlux.Test
                     "Handle",
                     MethodAttributes.Public | MethodAttributes.Virtual,
                     typeof(Task<>).MakeGenericType(responseType),
-                    new[] { requestType });
+                    new[] { requestType, typeof(CancellationToken) });
                 var il2 = handleMethod2.GetILGenerator();
                 il2.Emit(OpCodes.Ldnull);
                 il2.Emit(OpCodes.Ret);
@@ -146,7 +146,7 @@ namespace EventFlux.Test
                     "Handle",
                     MethodAttributes.Public | MethodAttributes.Virtual,
                     typeof(Task),
-                    new[] { notificationType });
+                    new[] { notificationType, typeof(CancellationToken) });
                 var il = handleMethod.GetILGenerator();
                 il.Emit(OpCodes.Ldnull);
                 il.Emit(OpCodes.Ret);

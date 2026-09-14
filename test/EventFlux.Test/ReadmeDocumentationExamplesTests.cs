@@ -14,7 +14,7 @@ namespace EventFlux.Test
 
     public class CreateUserHandler : IEventHandler<CreateUserCommand, CreateUserResponse>
     {
-        public Task<CreateUserResponse> Handle(CreateUserCommand request)
+        public Task<CreateUserResponse> Handle(CreateUserCommand request, CancellationToken cancellationToken = default)
         {
             var userId = Guid.NewGuid();
             return Task.FromResult(new CreateUserResponse(userId, true));
@@ -44,7 +44,7 @@ namespace EventFlux.Test
     {
         public static List<string> ExecutionLog = new();
 
-        public Task Handle(UserCreatedNotification notification)
+        public Task Handle(UserCreatedNotification notification, CancellationToken cancellationToken = default)
         {
             ExecutionLog.Add("AuditLog");
             return Task.CompletedTask;
@@ -54,7 +54,7 @@ namespace EventFlux.Test
     [HandlerOrder(2)]
     public class SendWelcomeEmailHandler : IEventHandler<UserCreatedNotification>
     {
-        public Task Handle(UserCreatedNotification notification)
+        public Task Handle(UserCreatedNotification notification, CancellationToken cancellationToken = default)
         {
             AuditLogHandler.ExecutionLog.Add("SendWelcomeEmail");
             return Task.CompletedTask;
@@ -69,7 +69,7 @@ namespace EventFlux.Test
 
         public bool CanHandle(OrderNotification @event) => @event.TotalAmount > 10000;
 
-        public Task Handle(OrderNotification @event)
+        public Task Handle(OrderNotification @event, CancellationToken cancellationToken = default)
         {
             WasHandled = true;
             return Task.CompletedTask;
@@ -82,7 +82,7 @@ namespace EventFlux.Test
     {
         public static int ShippedCount = 0;
 
-        public Task Handle(OrderShippedEvent @event)
+        public Task Handle(OrderShippedEvent @event, CancellationToken cancellationToken = default)
         {
             Interlocked.Increment(ref ShippedCount);
             return Task.CompletedTask;
