@@ -5,7 +5,7 @@ using System.Collections.Generic;
 using System.Linq;
 using EventFlux.Abstractions;
 
-namespace EventFlux
+namespace EventFlux.Services
 {
     /// <summary>
     /// Service managing request-to-response type associations.
