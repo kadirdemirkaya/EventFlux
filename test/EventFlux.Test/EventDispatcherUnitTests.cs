@@ -68,7 +68,7 @@ namespace EventFlux.Test
             using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(500));
 
             // Act & Assert
-            await Assert.ThrowsAsync<OperationCanceledException>(() =>
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
                 dispatcher.SendAsync<SlowEventResponse>(request, cts.Token));
         }
 

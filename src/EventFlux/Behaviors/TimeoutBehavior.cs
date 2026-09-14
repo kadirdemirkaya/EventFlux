@@ -35,10 +35,14 @@ namespace EventFlux.Behaviors
             {
                 await next(linkedCts.Token).WaitAsync(linkedCts.Token).ConfigureAwait(false);
             }
-            catch (OperationCanceledException) when (linkedCts.IsCancellationRequested)
+            catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested)
             {
                 _logger.LogWarning("[Timeout] Event processing exceeded the allowed time limit.");
                 throw new OperationCanceledException("Timeout occurred");
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw new OperationCanceledException(cancellationToken);
             }
         }
     }
@@ -81,10 +85,14 @@ namespace EventFlux.Behaviors
             {
                 return await next(linkedCts.Token).WaitAsync(linkedCts.Token).ConfigureAwait(false);
             }
-            catch (OperationCanceledException) when (linkedCts.IsCancellationRequested)
+            catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested)
             {
                 _logger.LogWarning("[Timeout] Event processing exceeded the allowed time limit.");
                 throw new OperationCanceledException("Timeout occurred");
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw new OperationCanceledException(cancellationToken);
             }
         }
     }
