@@ -10,7 +10,7 @@ EventFlux is a lightweight, high-performance in-memory event dispatching and CQR
 
 ## Key Features
 
-- **Blazing Fast**: Compiled expression tree delegate caching with minimal dispatch overhead (~81 ns).
+- **Blazing Fast**: Compiled expression tree delegate caching and allocation-lean dispatch — ~113 ns for `SendAsync` and ~225 ns / 424 B for a single-handler `PublishAsync`.
 - **Request / Response**: Send a command or query to a single handler and receive a response via `SendAsync`.
 - **Publish / Subscribe**: Broadcast notification events to multiple handlers via `PublishAsync`.
 - **Execution Strategies**: Run notification handlers concurrently (`Parallel`) or in guaranteed order (`Sequential`) via `PublishStrategy`.
@@ -122,13 +122,30 @@ EventFlux provides two dispatch interfaces to fit your performance and architect
 | **Primary Focus** | Direct, high-throughput, low-latency dispatch | Extensible pipeline dispatch |
 | **Pipeline Behaviors (`IEventCustomPipeline`)** | ❌ Bypassed (direct invocation) | ✅ Supported (wraps handlers in pipeline) |
 | **`[HandlerOrder]` Support** | ✅ Supported (order-based invocation) | ✅ Supported (order-based invocation) |
-| **Dispatch Overhead** | Minimal (~81 ns) | Low (includes pipeline middleware) |
+| **Dispatch Overhead** | Minimal (~113 ns send, ~225 ns publish) | Low (~269 ns send, ~376 ns publish — includes pipeline middleware) |
 | **Publish / Subscribe (`PublishAsync`)** | ✅ Supported | ✅ Supported |
 | **Batch / Stack Dispatch (`AddStackRequestEvent`)** | ✅ Supported | ❌ |
 
 > **When to use which?**
 > - Use **`IEventBus`** when you want fast, direct execution without pipeline middleware overhead.
 > - Use **`IEventDispatcher`** when you need cross-cutting behaviors (validation, logging, caching, metrics).
+
+### Benchmarks
+
+Measured with [BenchmarkDotNet](https://github.com/dotnet/BenchmarkDotNet) on .NET 8.0 (`ShortRunJob` +
+`MemoryDiagnoser`), handlers returning `Task.CompletedTask` so the numbers reflect dispatch overhead
+rather than handler work.
+
+| Operation | Mean | Allocated |
+|---|---:|---:|
+| `IEventBus.SendAsync` | 113 ns | 320 B |
+| `IEventBus.PublishAsync` (1 handler) | 225 ns | 424 B |
+| `IEventBus.PublishAsync` (3 handlers) | 299 ns | 536 B |
+| `IEventDispatcher.SendAsync` | 269 ns | 512 B |
+| `IEventDispatcher.PublishAsync` (1 handler) | 376 ns | 616 B |
+| `IEventDispatcher.PublishAsync` (3 handlers) | 481 ns | 720 B |
+
+Absolute numbers depend on your hardware and runtime — treat them as relative guidance, not a guarantee.
 
 ---
 
