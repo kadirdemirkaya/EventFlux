@@ -9,10 +9,10 @@ namespace EventFlux.Options
     {
         /// <summary>
         /// Gets or sets a value indicating whether a new dependency injection scope is created for each event dispatch.
-        /// When <c>true</c> (default), each event runs in an isolated child scope.
-        /// When <c>false</c>, handlers and behaviors are resolved directly from the ambient service provider.
+        /// When <c>false</c> (default in v2.0+), handlers and behaviors are resolved directly from the ambient service provider.
+        /// When <c>true</c>, each event runs in an isolated child scope.
         /// </summary>
-        public bool CreateScopePerEvent { get; set; } = true;
+        public bool CreateScopePerEvent { get; set; } = false;
 
         /// <summary>
         /// Gets or sets the execution strategy for notification handlers during publish operations.

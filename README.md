@@ -266,7 +266,7 @@ Customize execution behavior globally during registration:
 builder.Services.AddEventBus(options =>
 {
     // Ambient Scope: Handlers share the caller's DI scope (e.g. DbContext / Unit of Work)
-    // Default is true (each event runs in an isolated child scope)
+    // Default is false in v2.0+ (ambient scope). Set to true for isolated child scope per event.
     options.CreateScopePerEvent = false;
 
     // Execution Strategy: Sequential (await each handler in order) or Parallel (Task.WhenAll)
