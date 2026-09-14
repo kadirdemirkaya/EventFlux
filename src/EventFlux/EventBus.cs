@@ -211,48 +211,52 @@ namespace EventFlux
 
             var handlerType = DispatchTypeCache.NotificationHandlerType(eventType);
 
-            var handlers = serviceProvider.GetServices(handlerType);
+            var invocations = HandlerInvocationBuilder.Build(
+                serviceProvider.GetServices(handlerType),
+                eventType,
+                out var invocationCount);
 
-            var invocations = handlers
-                .Where(handler => handler is not null)
-                .Select(handler => (Handler: handler!, Accessor: HandlerAccessor.ForConcreteType(handler!.GetType(), eventType)))
-                .Where(entry => entry.Accessor is not null)
-                .OrderBy(entry => entry.Accessor!.Priority)
-                .ToList();
-
-            if (invocations.Count == 0)
+            if (invocationCount == 0)
                 return;
 
             if (_options.PublishStrategy == PublishStrategy.Sequential)
             {
-                foreach (var entry in invocations)
+                for (var i = 0; i < invocationCount; i++)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
 
-                    var accessor = entry.Accessor!;
+                    var entry = invocations[i];
 
-                    if (accessor.CanHandle != null && !accessor.CanHandle(entry.Handler, request))
+                    if (entry.Accessor.CanHandle != null && !entry.Accessor.CanHandle(entry.Handler, request))
                         continue;
 
-                    await ((Task)accessor.Handle(entry.Handler, request, cancellationToken)).ConfigureAwait(false);
+                    await ((Task)entry.Accessor.Handle(entry.Handler, request, cancellationToken)).ConfigureAwait(false);
                 }
             }
             else
             {
-                var tasks = invocations.Select(async entry =>
+                var tasks = new Task[invocationCount];
+
+                for (var i = 0; i < invocationCount; i++)
                 {
-                    cancellationToken.ThrowIfCancellationRequested();
-
-                    var accessor = entry.Accessor!;
-
-                    if (accessor.CanHandle != null && !accessor.CanHandle(entry.Handler, request))
-                        return;
-
-                    await ((Task)accessor.Handle(entry.Handler, request, cancellationToken)).ConfigureAwait(false);
-                });
+                    tasks[i] = InvokeInvocationAsync(invocations[i], request, cancellationToken);
+                }
 
                 await Task.WhenAll(tasks).ConfigureAwait(false);
             }
+        }
+
+        private static async Task InvokeInvocationAsync(
+            HandlerInvocation invocation,
+            IEventRequest request,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            if (invocation.Accessor.CanHandle != null && !invocation.Accessor.CanHandle(invocation.Handler, request))
+                return;
+
+            await ((Task)invocation.Accessor.Handle(invocation.Handler, request, cancellationToken)).ConfigureAwait(false);
         }
 
         /// <inheritdoc />

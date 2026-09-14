@@ -70,7 +70,7 @@ namespace EventFlux
             var handler = serviceProvider.GetRequiredService(handlerType);
 
             var behaviorType = DispatchTypeCache.RequestPipelineType(requestType, typeof(TResponse));
-            var behaviors = serviceProvider.GetServices(behaviorType).Reverse().ToList();
+            var behaviors = HandlerInvocationBuilder.AsReadOnlyList(serviceProvider.GetServices(behaviorType));
 
             var accessor = DispatchTypeCache.ForInterface(handlerType);
 
@@ -86,8 +86,9 @@ namespace EventFlux
                 return (Task<TResponse>)accessor.Handle(handler, request, cancellationToken);
             };
 
-            foreach (var behavior in behaviors)
+            for (var i = behaviors.Count - 1; i >= 0; i--)
             {
+                var behavior = behaviors[i];
                 var next = handlerDelegate;
                 var behaviorInvoker = DispatchTypeCache.BehaviorInvoker(behavior!.GetType());
 
@@ -124,48 +125,89 @@ namespace EventFlux
             var requestType = request.GetType();
             var handlerInterface = DispatchTypeCache.NotificationHandlerType(requestType);
 
-            var handlerTypes = serviceProvider
-                .GetServices(handlerInterface)
-                .OrderBy(h =>
-                    h.GetType().GetCustomAttribute<HandlerOrderAttribute>()?.Priority ?? 0)
-                .ToList();
+            var handlers = HandlerInvocationBuilder.AsReadOnlyList(serviceProvider.GetServices(handlerInterface));
 
-            if (handlerTypes.Count == 0)
+            if (handlers.Count == 0)
                 return;
+
+            var orderedHandlers = new object[handlers.Count];
+            var priorities = new int[handlers.Count];
+
+            for (var i = 0; i < handlers.Count; i++)
+            {
+                var handler = handlers[i]!;
+
+                orderedHandlers[i] = handler;
+                priorities[i] = GetHandlerPriority(handler.GetType(), requestType);
+            }
+
+            SortByPriority(orderedHandlers, priorities);
 
             var behaviorType = DispatchTypeCache.NotificationPipelineType(requestType);
 
-            var behaviors = serviceProvider
-                .GetServices(behaviorType)
-                .Cast<object>()
-                .Reverse()
-                .ToList();
+            var behaviors = HandlerInvocationBuilder.AsReadOnlyList(serviceProvider.GetServices(behaviorType));
 
             EventHandlerDelegate handlerDelegate = async ct =>
             {
                 if (_options.PublishStrategy == PublishStrategy.Sequential)
                 {
-                    foreach (var handler in handlerTypes)
+                    for (var i = 0; i < orderedHandlers.Length; i++)
                     {
-                        await InvokeHandlerAsync(handler, request, ct).ConfigureAwait(false);
+                        await InvokeHandlerAsync(orderedHandlers[i], request, ct).ConfigureAwait(false);
                     }
                 }
                 else
                 {
-                    var tasks = handlerTypes.Select(handler => InvokeHandlerAsync(handler, request, ct));
+                    var tasks = new Task[orderedHandlers.Length];
+
+                    for (var i = 0; i < orderedHandlers.Length; i++)
+                    {
+                        tasks[i] = InvokeHandlerAsync(orderedHandlers[i], request, ct);
+                    }
+
                     await Task.WhenAll(tasks).ConfigureAwait(false);
                 }
             };
 
-            foreach (var behavior in behaviors)
+            for (var i = behaviors.Count - 1; i >= 0; i--)
             {
+                var behavior = behaviors[i];
                 var next = handlerDelegate;
-                var behaviorInvoker = DispatchTypeCache.BehaviorInvoker(behavior.GetType());
+                var behaviorInvoker = DispatchTypeCache.BehaviorInvoker(behavior!.GetType());
 
                 handlerDelegate = ct => (Task)behaviorInvoker(behavior, request, next, ct);
             }
 
             await handlerDelegate(cancellationToken).ConfigureAwait(false);
+        }
+
+        private static int GetHandlerPriority(Type handlerType, Type requestType)
+        {
+            var accessor = HandlerAccessor.ForConcreteType(handlerType, requestType);
+
+            return accessor?.Priority
+                ?? handlerType.GetCustomAttribute<HandlerOrderAttribute>()?.Priority
+                ?? 0;
+        }
+
+        private static void SortByPriority(object[] handlers, int[] priorities)
+        {
+            for (var i = 1; i < handlers.Length; i++)
+            {
+                var currentHandler = handlers[i];
+                var currentPriority = priorities[i];
+                var j = i - 1;
+
+                while (j >= 0 && priorities[j] > currentPriority)
+                {
+                    handlers[j + 1] = handlers[j];
+                    priorities[j + 1] = priorities[j];
+                    j--;
+                }
+
+                handlers[j + 1] = currentHandler;
+                priorities[j + 1] = currentPriority;
+            }
         }
 
         private async Task InvokeHandlerAsync(
