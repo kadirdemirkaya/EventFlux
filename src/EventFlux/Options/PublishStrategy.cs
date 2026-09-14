@@ -6,7 +6,7 @@ namespace EventFlux.Options
     public enum PublishStrategy
     {
         /// <summary>
-        /// Handlers are executed concurrently using <see cref="System.Threading.Tasks.Task.WhenAll"/>.
+        /// Handlers are executed concurrently using <see cref="System.Threading.Tasks.Task.WhenAll(System.Collections.Generic.IEnumerable{System.Threading.Tasks.Task})"/>.
         /// </summary>
         Parallel = 0,
 

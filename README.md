@@ -21,7 +21,7 @@ EventFlux is a lightweight, high-performance in-memory event dispatching and CQR
 - **Handler Ordering**: Control execution sequence for multi-handler events with `[HandlerOrder(priority)]`.
 - **Precondition Evaluation**: Selectively gate handler execution across both `SendAsync` and `PublishAsync` with `CanHandle`.
 - **Deferred Batch Dispatch**: Queue events and dispatch them across scopes via `EventStackService` and `StackEventDispatcherAsync`.
-- **Multi-Targeting**: Supports .NET 6.0, 7.0, 8.0, and 9.0 with SourceLink and symbol debugging (`.snupkg`) enabled.
+- **Multi-Targeting**: Supports .NET 8.0, 9.0, and 10.0 with SourceLink and symbol debugging (`.snupkg`) enabled.
 
 ---
 
