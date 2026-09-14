@@ -35,7 +35,7 @@ namespace EventFlux.Test
     {
         public bool CanHandle(ConditionalRequest @event) => @event.Allow;
 
-        public Task<ConditionalResponse> Handle(ConditionalRequest @event)
+        public Task<ConditionalResponse> Handle(ConditionalRequest @event, CancellationToken cancellationToken = default)
         {
             return Task.FromResult(new ConditionalResponse("Handled"));
         }

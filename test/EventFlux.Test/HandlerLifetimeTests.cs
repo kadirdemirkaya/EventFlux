@@ -18,7 +18,7 @@ namespace EventFlux.Test
     {
         public Guid InstanceId { get; } = Guid.NewGuid();
 
-        public Task<LifetimeResponse> Handle(LifetimeRequest request)
+        public Task<LifetimeResponse> Handle(LifetimeRequest request, CancellationToken cancellationToken = default)
         {
             return Task.FromResult(new LifetimeResponse { InstanceId = InstanceId });
         }
@@ -32,7 +32,7 @@ namespace EventFlux.Test
     {
         public Guid InstanceId { get; } = Guid.NewGuid();
 
-        public Task Handle(LifetimeNotification @event)
+        public Task Handle(LifetimeNotification @event, CancellationToken cancellationToken = default)
         {
             return Task.CompletedTask;
         }

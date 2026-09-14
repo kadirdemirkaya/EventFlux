@@ -15,7 +15,7 @@ namespace EventFlux.Test
         public static readonly List<string> HandledPayloads = new();
         public static readonly object SyncLock = new();
 
-        public Task Handle(StackTestEvent @event)
+        public Task Handle(StackTestEvent @event, CancellationToken cancellationToken = default)
         {
             lock (SyncLock)
             {

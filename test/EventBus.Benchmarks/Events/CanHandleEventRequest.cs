@@ -1,4 +1,4 @@
-﻿using EventFlux.Abstractions;
+using EventFlux.Abstractions;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -17,7 +17,7 @@ namespace EventBus.Benchmarks.Events
         public bool CanHandle(CanHandleEventRequest @event)
             => @event.Data.Length > 15;
 
-        public async Task Handle(CanHandleEventRequest @event)
+        public async Task Handle(CanHandleEventRequest @event, CancellationToken cancellationToken = default)
         {
             Console.WriteLine("Received event", @event.Data);
         }

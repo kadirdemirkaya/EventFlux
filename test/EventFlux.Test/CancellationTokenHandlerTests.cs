@@ -8,14 +8,14 @@ namespace EventFlux.Test
     [Collection("SharedHandlerCounters")]
     public class CancellationTokenHandlerTests
     {
-        public record LegacyCommand(string Name) : IEventRequest<LegacyCommandResponse>;
-        public record LegacyCommandResponse(string Result) : IEventResponse;
+        public record StandardCommand(string Name) : IEventRequest<StandardCommandResponse>;
+        public record StandardCommandResponse(string Result) : IEventResponse;
 
-        public class LegacyCommandHandler : IEventHandler<LegacyCommand, LegacyCommandResponse>
+        public class StandardCommandHandler : IEventHandler<StandardCommand, StandardCommandResponse>
         {
-            public Task<LegacyCommandResponse> Handle(LegacyCommand @event)
+            public Task<StandardCommandResponse> Handle(StandardCommand @event, CancellationToken cancellationToken)
             {
-                return Task.FromResult(new LegacyCommandResponse($"Hello {@event.Name}"));
+                return Task.FromResult(new StandardCommandResponse($"Hello {@event.Name}"));
             }
         }
 
@@ -34,13 +34,13 @@ namespace EventFlux.Test
             }
         }
 
-        public record LegacyNotification(string Message) : IEventRequest;
+        public record StandardNotification(string Message) : IEventRequest;
 
-        public class LegacyNotificationHandler : IEventHandler<LegacyNotification>
+        public class StandardNotificationHandler : IEventHandler<StandardNotification>
         {
             public static bool WasCalled { get; set; }
 
-            public Task Handle(LegacyNotification @event)
+            public Task Handle(StandardNotification @event, CancellationToken cancellationToken)
             {
                 WasCalled = true;
                 return Task.CompletedTask;
@@ -85,14 +85,14 @@ namespace EventFlux.Test
         }
 
         [Fact]
-        public async Task EventBus_SendAsync_WithLegacyHandler_ExecutesSuccessfully()
+        public async Task EventBus_SendAsync_WithStandardHandler_ExecutesSuccessfully()
         {
             // Arrange
             using var sp = CreateProvider();
             var bus = sp.GetRequiredService<IEventBus>();
 
             // Act
-            var response = await bus.SendAsync(new LegacyCommand("World"));
+            var response = await bus.SendAsync(new StandardCommand("World"));
 
             // Assert
             Assert.NotNull(response);
@@ -150,18 +150,18 @@ namespace EventFlux.Test
         }
 
         [Fact]
-        public async Task EventBus_PublishAsync_WithLegacyNotificationHandler_ExecutesSuccessfully()
+        public async Task EventBus_PublishAsync_WithStandardNotificationHandler_ExecutesSuccessfully()
         {
             // Arrange
             using var sp = CreateProvider();
             var bus = sp.GetRequiredService<IEventBus>();
-            LegacyNotificationHandler.WasCalled = false;
+            StandardNotificationHandler.WasCalled = false;
 
             // Act
-            await bus.PublishAsync(new LegacyNotification("Hello"));
+            await bus.PublishAsync(new StandardNotification("Hello"));
 
             // Assert
-            Assert.True(LegacyNotificationHandler.WasCalled);
+            Assert.True(StandardNotificationHandler.WasCalled);
         }
 
         [Fact]
@@ -228,6 +228,42 @@ namespace EventFlux.Test
             {
                 await dispatcher.SendAsync(new LongRunningCommand(200), cts.Token);
             });
+        }
+
+        [Fact]
+        public void IEventHandlerRequestResponse_HasOnlyOneHandleMethod_WithCancellationToken()
+        {
+            // Arrange & Act
+            var handleMethods = typeof(IEventHandler<StandardCommand, StandardCommandResponse>)
+                .GetMethods()
+                .Where(m => m.Name == "Handle")
+                .ToList();
+
+            // Assert
+            Assert.Single(handleMethods);
+            var method = handleMethods[0];
+            var parameters = method.GetParameters();
+            Assert.Equal(2, parameters.Length);
+            Assert.Equal(typeof(StandardCommand), parameters[0].ParameterType);
+            Assert.Equal(typeof(CancellationToken), parameters[1].ParameterType);
+        }
+
+        [Fact]
+        public void IEventHandlerNotification_HasOnlyOneHandleMethod_WithCancellationToken()
+        {
+            // Arrange & Act
+            var handleMethods = typeof(IEventHandler<StandardNotification>)
+                .GetMethods()
+                .Where(m => m.Name == "Handle")
+                .ToList();
+
+            // Assert
+            Assert.Single(handleMethods);
+            var method = handleMethods[0];
+            var parameters = method.GetParameters();
+            Assert.Equal(2, parameters.Length);
+            Assert.Equal(typeof(StandardNotification), parameters[0].ParameterType);
+            Assert.Equal(typeof(CancellationToken), parameters[1].ParameterType);
         }
     }
 }

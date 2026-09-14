@@ -39,9 +39,6 @@ namespace EventFlux.Internal
             var handleMethod = handlerInterfaceType.GetMethod(
                 "Handle",
                 new[] { requestType, typeof(CancellationToken) })
-                ?? handlerInterfaceType.GetMethod(
-                    "Handle",
-                    new[] { requestType })
                 ?? throw new InvalidOperationException($"Handler method 'Handle' not found for {handlerInterfaceType.Name}");
 
             var canHandleMethod = handlerInterfaceType.GetMethod("CanHandle", new[] { requestType });

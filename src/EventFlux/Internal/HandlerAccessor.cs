@@ -37,18 +37,11 @@ namespace EventFlux.Internal
 
         private static HandlerAccessor? Build(Type handlerType, Type eventType)
         {
-            var handleMethodWithToken = handlerType.GetMethod(
+            var handleMethod = handlerType.GetMethod(
                 "Handle",
                 BindingFlags.Instance | BindingFlags.Public,
                 binder: null,
                 new[] { eventType, typeof(CancellationToken) },
-                modifiers: null);
-
-            var handleMethod = handleMethodWithToken ?? handlerType.GetMethod(
-                "Handle",
-                BindingFlags.Instance | BindingFlags.Public,
-                binder: null,
-                new[] { eventType },
                 modifiers: null);
 
             if (handleMethod == null)
@@ -58,10 +51,7 @@ namespace EventFlux.Internal
                 {
                     handleMethod = notificationInterface.GetMethod(
                         "Handle",
-                        new[] { eventType, typeof(CancellationToken) })
-                        ?? notificationInterface.GetMethod(
-                            "Handle",
-                            new[] { eventType });
+                        new[] { eventType, typeof(CancellationToken) });
                 }
             }
 
@@ -90,23 +80,11 @@ namespace EventFlux.Internal
             var argumentParameter = Expression.Parameter(typeof(object), "argument");
             var tokenParameter = Expression.Parameter(typeof(CancellationToken), "cancellationToken");
 
-            var parameters = method.GetParameters();
-            MethodCallExpression call;
-            if (parameters.Length == 2 && parameters[1].ParameterType == typeof(CancellationToken))
-            {
-                call = Expression.Call(
-                    Expression.Convert(targetParameter, targetType),
-                    method,
-                    Expression.Convert(argumentParameter, argumentType),
-                    tokenParameter);
-            }
-            else
-            {
-                call = Expression.Call(
-                    Expression.Convert(targetParameter, targetType),
-                    method,
-                    Expression.Convert(argumentParameter, argumentType));
-            }
+            var call = Expression.Call(
+                Expression.Convert(targetParameter, targetType),
+                method,
+                Expression.Convert(argumentParameter, argumentType),
+                tokenParameter);
 
             return Expression
                 .Lambda<Func<object, object, CancellationToken, object>>(

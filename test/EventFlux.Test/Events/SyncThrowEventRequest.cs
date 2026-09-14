@@ -10,7 +10,7 @@ namespace EventFlux.Test.Events
     {
         public const string Message = "handler threw before returning a task";
 
-        public Task Handle(SyncThrowEventRequest request)
+        public Task Handle(SyncThrowEventRequest request, CancellationToken cancellationToken = default)
             => throw new InvalidOperationException(Message);
     }
 
@@ -26,7 +26,7 @@ namespace EventFlux.Test.Events
     {
         public const string Message = "response handler threw before returning a task";
 
-        public Task<SyncThrowResponse> Handle(SyncThrowResponseRequest request)
+        public Task<SyncThrowResponse> Handle(SyncThrowResponseRequest request, CancellationToken cancellationToken = default)
             => throw new InvalidOperationException(Message);
     }
 }

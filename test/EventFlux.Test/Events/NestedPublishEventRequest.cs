@@ -19,11 +19,11 @@ namespace EventFlux.Test.Events
             _dispatcher = dispatcher;
         }
 
-        public async Task Handle(NestedOuterEventRequest request)
+        public async Task Handle(NestedOuterEventRequest request, CancellationToken cancellationToken = default)
         {
-            await Task.Delay(50);
+            await Task.Delay(50, cancellationToken);
 
-            await _dispatcher.PublishAsync(new NestedInnerEventRequest());
+            await _dispatcher.PublishAsync(new NestedInnerEventRequest(), cancellationToken);
         }
     }
 
@@ -31,7 +31,7 @@ namespace EventFlux.Test.Events
     {
         public static int HandledCount;
 
-        public Task Handle(NestedInnerEventRequest request)
+        public Task Handle(NestedInnerEventRequest request, CancellationToken cancellationToken = default)
         {
             Interlocked.Increment(ref HandledCount);
 

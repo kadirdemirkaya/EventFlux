@@ -1,4 +1,4 @@
-﻿using EventFlux.Abstractions;
+using EventFlux.Abstractions;
 
 namespace EventFlux.Test.Events
 {
@@ -10,9 +10,9 @@ namespace EventFlux.Test.Events
     {
         public static int HandledCount = 0;
 
-        public async Task Handle(PublishEventRequest request)
+        public async Task Handle(PublishEventRequest request, CancellationToken cancellationToken = default)
         {
-            await Task.Delay(50);
+            await Task.Delay(50, cancellationToken);
             Interlocked.Increment(ref HandledCount);
         }
     }

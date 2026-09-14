@@ -26,7 +26,7 @@ namespace EventFlux.Test
 
     public class DummyNormalEventHandler : IEventHandler<TestNormalEvent>
     {
-        public Task Handle(TestNormalEvent @event) => Task.CompletedTask;
+        public Task Handle(TestNormalEvent @event, CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 
     public class EventServicesTypeSafetyTests

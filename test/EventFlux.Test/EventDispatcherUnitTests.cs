@@ -188,7 +188,7 @@ namespace EventFlux.Test
         public static int MaxConcurrentCount = 0;
         private static readonly object _lock = new();
 
-        public async Task Handle(ConcurrentTestEventRequest request)
+        public async Task Handle(ConcurrentTestEventRequest request, CancellationToken cancellationToken = default)
         {
             var active = Interlocked.Increment(ref ActiveCount);
             lock (_lock)
@@ -198,7 +198,7 @@ namespace EventFlux.Test
                     MaxConcurrentCount = active;
                 }
             }
-            await Task.Delay(100);
+            await Task.Delay(100, cancellationToken);
             Interlocked.Decrement(ref ActiveCount);
         }
     }

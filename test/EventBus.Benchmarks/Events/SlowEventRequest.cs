@@ -1,4 +1,4 @@
-﻿using EventFlux.Abstractions;
+using EventFlux.Abstractions;
 
 namespace EventBus.Benchmarks.Events
 {
@@ -13,10 +13,10 @@ namespace EventBus.Benchmarks.Events
 
     public class SlowEventHandler : IEventHandler<SlowEventRequest, SlowEventResponse>
     {
-        public async Task<SlowEventResponse> Handle(SlowEventRequest request)
+        public async Task<SlowEventResponse> Handle(SlowEventRequest request, CancellationToken cancellationToken = default)
         {
             Console.WriteLine("SlowEventHandler: Starting slow operation...");
-            await Task.Delay(31000); // Simulate slow operation
+            await Task.Delay(31000, cancellationToken); // Simulate slow operation
             Console.WriteLine("SlowEventHandler: Completed slow operation");
             return new SlowEventResponse { Result = "Completed" };
         }

@@ -28,7 +28,7 @@ namespace EventFlux.Test
             _dependency = dependency;
         }
 
-        public Task<ScopeTestResponse> Handle(ScopeTestCommand request)
+        public Task<ScopeTestResponse> Handle(ScopeTestCommand request, CancellationToken cancellationToken = default)
         {
             return Task.FromResult(new ScopeTestResponse
             {
@@ -59,7 +59,7 @@ namespace EventFlux.Test
             _dependency = dependency;
         }
 
-        public Task Handle(ScopeTestNotification @event)
+        public Task Handle(ScopeTestNotification @event, CancellationToken cancellationToken = default)
         {
             lock (ScopeTestNotification.RecordedIds)
             {
