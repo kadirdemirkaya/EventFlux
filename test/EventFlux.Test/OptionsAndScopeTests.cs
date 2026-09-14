@@ -94,31 +94,31 @@ namespace EventFlux.Test
         }
 
         [Fact]
-        public void DefaultOptions_HasCreateScopePerEventTrue()
+        public void DefaultOptions_HasCreateScopePerEventFalse()
         {
             // Arrange & Act
             var options = new EventFluxOptions();
-
-            // Assert
-            Assert.True(options.CreateScopePerEvent);
-        }
-
-        [Fact]
-        public void AddEventBus_WithCustomOptions_RegistersConfiguredOptions()
-        {
-            // Arrange & Act
-            using var provider = CreateProvider(opt => opt.CreateScopePerEvent = false);
-            var options = provider.GetRequiredService<EventFluxOptions>();
 
             // Assert
             Assert.False(options.CreateScopePerEvent);
         }
 
         [Fact]
-        public async Task EventBus_SendAsync_WithAmbientScope_SharesCallersScopedService()
+        public void AddEventBus_WithCustomOptions_RegistersConfiguredOptions()
+        {
+            // Arrange & Act
+            using var provider = CreateProvider(opt => opt.CreateScopePerEvent = true);
+            var options = provider.GetRequiredService<EventFluxOptions>();
+
+            // Assert
+            Assert.True(options.CreateScopePerEvent);
+        }
+
+        [Fact]
+        public async Task EventBus_SendAsync_WithDefaultAmbientScope_SharesCallersScopedService()
         {
             // Arrange
-            using var provider = CreateProvider(opt => opt.CreateScopePerEvent = false);
+            using var provider = CreateProvider();
             using var callerScope = provider.CreateScope();
 
             var callerDependency = callerScope.ServiceProvider.GetRequiredService<ScopedProbeDependency>();
@@ -133,10 +133,10 @@ namespace EventFlux.Test
         }
 
         [Fact]
-        public async Task EventBus_SendAsync_WithDefaultChildScope_DoesNotShareCallersScopedService()
+        public async Task EventBus_SendAsync_WithOptInChildScope_DoesNotShareCallersScopedService()
         {
             // Arrange
-            using var provider = CreateProvider();
+            using var provider = CreateProvider(opt => opt.CreateScopePerEvent = true);
             using var callerScope = provider.CreateScope();
 
             var callerDependency = callerScope.ServiceProvider.GetRequiredService<ScopedProbeDependency>();
@@ -151,11 +151,11 @@ namespace EventFlux.Test
         }
 
         [Fact]
-        public async Task EventBus_PublishAsync_WithAmbientScope_SharesCallersScopedService()
+        public async Task EventBus_PublishAsync_WithDefaultAmbientScope_SharesCallersScopedService()
         {
             // Arrange
             ScopeTestNotification.Reset();
-            using var provider = CreateProvider(opt => opt.CreateScopePerEvent = false);
+            using var provider = CreateProvider();
             using var callerScope = provider.CreateScope();
 
             var callerDependency = callerScope.ServiceProvider.GetRequiredService<ScopedProbeDependency>();
@@ -170,10 +170,10 @@ namespace EventFlux.Test
         }
 
         [Fact]
-        public async Task EventDispatcher_SendAsync_WithAmbientScope_SharesCallersScopedService()
+        public async Task EventDispatcher_SendAsync_WithDefaultAmbientScope_SharesCallersScopedService()
         {
             // Arrange
-            using var provider = CreateProvider(opt => opt.CreateScopePerEvent = false);
+            using var provider = CreateProvider();
             using var callerScope = provider.CreateScope();
 
             var callerDependency = callerScope.ServiceProvider.GetRequiredService<ScopedProbeDependency>();
@@ -188,11 +188,11 @@ namespace EventFlux.Test
         }
 
         [Fact]
-        public async Task EventDispatcher_PublishAsync_WithAmbientScope_SharesCallersScopedService()
+        public async Task EventDispatcher_PublishAsync_WithDefaultAmbientScope_SharesCallersScopedService()
         {
             // Arrange
             ScopeTestNotification.Reset();
-            using var provider = CreateProvider(opt => opt.CreateScopePerEvent = false);
+            using var provider = CreateProvider();
             using var callerScope = provider.CreateScope();
 
             var callerDependency = callerScope.ServiceProvider.GetRequiredService<ScopedProbeDependency>();
@@ -207,10 +207,10 @@ namespace EventFlux.Test
         }
 
         [Fact]
-        public async Task EventDispatcher_SendAsync_WithDefaultChildScope_DoesNotShareCallersScopedService()
+        public async Task EventDispatcher_SendAsync_WithOptInChildScope_DoesNotShareCallersScopedService()
         {
             // Arrange
-            using var provider = CreateProvider();
+            using var provider = CreateProvider(opt => opt.CreateScopePerEvent = true);
             using var callerScope = provider.CreateScope();
 
             var callerDependency = callerScope.ServiceProvider.GetRequiredService<ScopedProbeDependency>();

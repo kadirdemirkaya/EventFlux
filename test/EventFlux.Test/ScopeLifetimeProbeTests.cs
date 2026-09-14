@@ -46,21 +46,25 @@ namespace EventFlux.Test
     [Collection("SharedHandlerCounters")]
     public class ScopeLifetimeProbeTests
     {
-        private static ServiceProvider BuildProvider()
+        private static ServiceProvider BuildProvider(Action<EventFlux.Options.EventFluxOptions>? configure = null)
         {
             var services = new ServiceCollection();
             services.AddLogging();
             services.AddScoped<TrackedScopedService>();
             services.AddEventDispatcher();
-            services.AddEventBus(typeof(ScopeLifetimeProbeTests).Assembly);
+
+            if (configure != null)
+                services.AddEventBus(configure, typeof(ScopeLifetimeProbeTests).Assembly);
+            else
+                services.AddEventBus(typeof(ScopeLifetimeProbeTests).Assembly);
 
             return services.BuildServiceProvider();
         }
 
         [Fact]
-        public async Task PublishAsync_DisposesTheScopeItCreates()
+        public async Task PublishAsync_WithOptInScopePerEvent_DisposesTheScopeItCreates()
         {
-            using var provider = BuildProvider();
+            using var provider = BuildProvider(opt => opt.CreateScopePerEvent = true);
             TrackedScopedService.Reset();
 
             await provider.GetRequiredService<IEventBus>().PublishAsync(new ScopeProbeEventRequest());
@@ -70,9 +74,9 @@ namespace EventFlux.Test
         }
 
         [Fact]
-        public async Task PublishAsync_RepeatedCalls_DoNotAccumulateUndisposedScopes()
+        public async Task PublishAsync_WithOptInScopePerEvent_RepeatedCalls_DoNotAccumulateUndisposedScopes()
         {
-            using var provider = BuildProvider();
+            using var provider = BuildProvider(opt => opt.CreateScopePerEvent = true);
             TrackedScopedService.Reset();
 
             for (var i = 0; i < 50; i++)
@@ -83,7 +87,24 @@ namespace EventFlux.Test
         }
 
         [Fact]
-        public async Task PublishAsync_HandlerDoesNotShareTheCallersScope()
+        public async Task PublishAsync_WithOptInScopePerEvent_HandlerDoesNotShareTheCallersScope()
+        {
+            using var provider = BuildProvider(opt => opt.CreateScopePerEvent = true);
+            TrackedScopedService.Reset();
+
+            using var callerScope = provider.CreateScope();
+            var callerInstance = callerScope.ServiceProvider.GetRequiredService<TrackedScopedService>();
+
+            await callerScope.ServiceProvider.GetRequiredService<IEventBus>()
+                .PublishAsync(new ScopeProbeEventRequest());
+
+            var handlerInstance = TrackedScopedService.SeenByHandler.Single();
+
+            Assert.NotEqual(callerInstance.Id, handlerInstance);
+        }
+
+        [Fact]
+        public async Task PublishAsync_WithDefaultAmbientScope_SharesTheCallersScope()
         {
             using var provider = BuildProvider();
             TrackedScopedService.Reset();
@@ -96,7 +117,7 @@ namespace EventFlux.Test
 
             var handlerInstance = TrackedScopedService.SeenByHandler.Single();
 
-            Assert.NotEqual(callerInstance.Id, handlerInstance);
+            Assert.Equal(callerInstance.Id, handlerInstance);
         }
     }
 }
