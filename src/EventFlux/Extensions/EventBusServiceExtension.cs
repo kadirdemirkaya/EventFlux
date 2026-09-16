@@ -1,10 +1,12 @@
 using EventFlux.Abstractions;
 using EventFlux.Behaviors;
+using EventFlux.Internal;
 using EventFlux.Options;
 using EventFlux.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
+using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 
 namespace EventFlux.Extensions
@@ -17,12 +19,20 @@ namespace EventFlux.Extensions
         /// <summary>
         /// Registers EventFlux event bus infrastructure, scanning provided assemblies for handlers.
         /// </summary>
+        /// <remarks>
+        /// Calling this method more than once is safe: handlers, <see cref="EventService"/>, <see cref="EventMapService"/>
+        /// and <see cref="IEventBus"/> are registered only once, and handlers discovered by later calls are merged into
+        /// the existing <see cref="EventService"/> and <see cref="EventMapService"/>. Types that fail to load from an
+        /// assembly are skipped instead of aborting the scan.
+        /// </remarks>
         /// <param name="services">The service collection to register into.</param>
         /// <param name="assemblies">Assemblies to scan for event handlers.</param>
         /// <returns>The service collection for chaining.</returns>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="services"/> is null.</exception>
         /// <exception cref="ArgumentException">Thrown when <paramref name="assemblies"/> is null, empty, or contains only null items.</exception>
-        /// <exception cref="InvalidOperationException">Thrown when duplicate handlers for the same request type are detected.</exception>
+        /// <exception cref="InvalidOperationException">Thrown when duplicate handlers for the same request type are detected, or when a scanned handler is an open generic type definition.</exception>
+        [RequiresDynamicCode(AotMessages.DynamicCode)]
+        [RequiresUnreferencedCode(AotMessages.UnreferencedCode)]
         public static IServiceCollection AddEventBus(this IServiceCollection services, params Assembly[] assemblies)
         {
             return AddEventBus(services, (Action<EventFluxOptions>?)null, assemblies);
@@ -31,13 +41,21 @@ namespace EventFlux.Extensions
         /// <summary>
         /// Registers EventFlux event bus infrastructure with custom options, scanning provided assemblies for handlers.
         /// </summary>
+        /// <remarks>
+        /// Calling this method more than once is safe: handlers, <see cref="EventService"/>, <see cref="EventMapService"/>
+        /// and <see cref="IEventBus"/> are registered only once, and handlers discovered by later calls are merged into
+        /// the existing <see cref="EventService"/> and <see cref="EventMapService"/>. Types that fail to load from an
+        /// assembly are skipped instead of aborting the scan.
+        /// </remarks>
         /// <param name="services">The service collection to register into.</param>
         /// <param name="configureOptions">Action to configure <see cref="EventFluxOptions"/>.</param>
         /// <param name="assemblies">Assemblies to scan for event handlers.</param>
         /// <returns>The service collection for chaining.</returns>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="services"/> is null.</exception>
         /// <exception cref="ArgumentException">Thrown when <paramref name="assemblies"/> is null, empty, or contains only null items.</exception>
-        /// <exception cref="InvalidOperationException">Thrown when duplicate handlers for the same request type are detected.</exception>
+        /// <exception cref="InvalidOperationException">Thrown when duplicate handlers for the same request type are detected, or when a scanned handler is an open generic type definition.</exception>
+        [RequiresDynamicCode(AotMessages.DynamicCode)]
+        [RequiresUnreferencedCode(AotMessages.UnreferencedCode)]
         public static IServiceCollection AddEventBus(this IServiceCollection services, Action<EventFluxOptions>? configureOptions, params Assembly[] assemblies)
         {
             if (services is null)
@@ -56,6 +74,8 @@ namespace EventFlux.Extensions
                 throw new ArgumentException("At least one valid assembly must be provided.", nameof(assemblies));
             }
 
+            var scan = ScanHandlerTypes(validAssemblies);
+
             EventFluxOptions options;
             if (configureOptions is not null)
             {
@@ -71,120 +91,38 @@ namespace EventFlux.Extensions
                 services.TryAddSingleton(options);
             }
 
-            List<Type> handlers = new();
-            Dictionary<Type, List<Type>> internalEventHandlers = new();
-            Dictionary<Type, Type> internalEventMaps = new();
-            Dictionary<Type, Type> requestToHandlerMap = new();
-            EventService _dictionaryService;
-            EventMapService _eventDictionaryMapService;
-
-            var handlerTypesWithResponse = validAssemblies
-                .SelectMany(a => a.GetTypes())
-                .Where(t => !t.IsInterface && !t.IsAbstract)
-                .Where(t => t.GetInterfaces().Any(i =>
-                    i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IEventHandler<,>)))
-                .Distinct()
-                .ToList();
-
-            handlers.AddRange(handlerTypesWithResponse);
-
-            foreach (var handlerType in handlerTypesWithResponse)
+            var eventService = ExistingInstance<EventService>(services);
+            if (eventService is null)
             {
-                var interfaceTypes = handlerType.GetInterfaces()
-                    .Where(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IEventHandler<,>));
-
-                foreach (var interfaceType in interfaceTypes)
-                {
-                    var genericArgs = interfaceType.GetGenericArguments();
-                    var requestType = genericArgs[0];
-                    var responseType = genericArgs[1];
-
-                    if (requestToHandlerMap.TryGetValue(requestType, out var existingHandlerType))
-                    {
-                        if (existingHandlerType != handlerType)
-                        {
-                            throw new InvalidOperationException(
-                                $"Duplicate handler registration detected for request type '{requestType.FullName}'. " +
-                                $"Conflicting handlers: '{existingHandlerType.FullName}' and '{handlerType.FullName}'. " +
-                                "A request can only have one handler.");
-                        }
-                        continue;
-                    }
-
-                    requestToHandlerMap[requestType] = handlerType;
-
-                    var requestInjectType = typeof(IEventHandler<,>).MakeGenericType(interfaceType.GenericTypeArguments);
-
-                    services.Add(new ServiceDescriptor(requestInjectType, handlerType, options.HandlerLifetime));
-
-                    if (!internalEventHandlers.ContainsKey(requestType))
-                    {
-                        internalEventHandlers[requestType] = new List<Type>();
-                    }
-
-                    if (!internalEventHandlers[requestType].Contains(handlerType))
-                    {
-                        internalEventHandlers[requestType].Add(handlerType);
-                    }
-
-                    if (!internalEventMaps.ContainsKey(requestType))
-                    {
-                        internalEventMaps[requestType] = responseType;
-                    }
-                }
+                eventService = new EventService(validAssemblies);
+                services.AddSingleton(eventService);
             }
 
-            var handlerTypes = validAssemblies
-                .SelectMany(a => a.GetTypes())
-                .Where(t => !t.IsInterface && !t.IsAbstract)
-                .Where(t => t.GetInterfaces().Any(i =>
-                    i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IEventHandler<>)))
-                .Distinct()
-                .ToList();
-
-            handlers.AddRange(handlerTypes);
-
-            foreach (var handlerType in handlerTypes)
+            var eventMapService = ExistingInstance<EventMapService>(services);
+            if (eventMapService is null)
             {
-                var interfaceTypes = handlerType.GetInterfaces()
-                    .Where(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IEventHandler<>));
-
-                foreach (var interfaceType in interfaceTypes)
-                {
-                    var requestInjectType = typeof(IEventHandler<>).MakeGenericType(interfaceType.GenericTypeArguments);
-                    services.TryAddEnumerable(new ServiceDescriptor(requestInjectType, handlerType, options.HandlerLifetime));
-
-                    var genericArgs = interfaceType.GetGenericArguments();
-                    var requestType = genericArgs[0];
-
-                    {
-                        if (!internalEventHandlers.ContainsKey(requestType))
-                        {
-                            internalEventHandlers[requestType] = new List<Type>();
-                        }
-
-                        if (!internalEventHandlers[requestType].Contains(handlerType))
-                        {
-                            internalEventHandlers[requestType].Add(handlerType);
-                        }
-                    }
-                }
+                eventMapService = new EventMapService(validAssemblies);
+                services.AddSingleton(eventMapService);
             }
 
-            _dictionaryService = new(validAssemblies, internalEventHandlers);
-            _eventDictionaryMapService = new(validAssemblies, internalEventMaps);
+            foreach (var registration in scan.RequestHandlers)
+            {
+                services.TryAddEnumerable(new ServiceDescriptor(registration.ServiceType, registration.HandlerType, options.HandlerLifetime));
+                eventService.Subscribe(registration.RequestType, registration.HandlerType);
+                eventMapService.AddMap(registration.RequestType, registration.ResponseType!);
+            }
 
-            services.AddSingleton<EventService>(_dictionaryService);
-            services.AddSingleton<EventMapService>(_eventDictionaryMapService);
+            foreach (var registration in scan.NotificationHandlers)
+            {
+                services.TryAddEnumerable(new ServiceDescriptor(registration.ServiceType, registration.HandlerType, options.HandlerLifetime));
+                eventService.Subscribe(registration.RequestType, registration.HandlerType);
+            }
+
             services.TryAddSingleton<EventStackService>();
 
-            services.AddScoped<IEventBus>(sp =>
+            services.TryAddScoped<IEventBus>(sp =>
                 new EventBus(
                     sp,
-                    validAssemblies,
-                    _dictionaryService,
-                    _eventDictionaryMapService,
-                    handlers,
                     sp.GetRequiredService<ILogger<EventBus>>(),
                     sp.GetService<EventFluxOptions>(),
                     sp.GetService<EventStackService>()
@@ -200,6 +138,8 @@ namespace EventFlux.Extensions
         /// <param name="services">The service collection to register into.</param>
         /// <returns>The service collection for chaining.</returns>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="services"/> is null.</exception>
+        [RequiresDynamicCode(AotMessages.DynamicCode)]
+        [RequiresUnreferencedCode(AotMessages.UnreferencedCode)]
         public static IServiceCollection AddEventDispatcher(this IServiceCollection services)
         {
             return AddEventDispatcher(services, (Action<EventFluxOptions>?)null);
@@ -212,6 +152,8 @@ namespace EventFlux.Extensions
         /// <param name="configureOptions">Action to configure <see cref="EventFluxOptions"/>.</param>
         /// <returns>The service collection for chaining.</returns>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="services"/> is null.</exception>
+        [RequiresDynamicCode(AotMessages.DynamicCode)]
+        [RequiresUnreferencedCode(AotMessages.UnreferencedCode)]
         public static IServiceCollection AddEventDispatcher(this IServiceCollection services, Action<EventFluxOptions>? configureOptions)
         {
             if (services is null)
@@ -272,6 +214,113 @@ namespace EventFlux.Extensions
             services.TryAddEnumerable(ServiceDescriptor.Transient(typeof(IEventCustomPipeline<,>), typeof(TimeoutBehavior<,>)));
 
             return services;
+        }
+
+        private readonly struct HandlerRegistration
+        {
+            public HandlerRegistration(Type handlerType, Type serviceType, Type requestType, Type? responseType)
+            {
+                HandlerType = handlerType;
+                ServiceType = serviceType;
+                RequestType = requestType;
+                ResponseType = responseType;
+            }
+
+            public Type HandlerType { get; }
+
+            public Type ServiceType { get; }
+
+            public Type RequestType { get; }
+
+            public Type? ResponseType { get; }
+        }
+
+        private sealed class HandlerScanResult
+        {
+            public List<HandlerRegistration> RequestHandlers { get; } = new();
+
+            public List<HandlerRegistration> NotificationHandlers { get; } = new();
+        }
+
+        [RequiresDynamicCode(AotMessages.DynamicCode)]
+        [RequiresUnreferencedCode(AotMessages.UnreferencedCode)]
+        private static HandlerScanResult ScanHandlerTypes(IEnumerable<Assembly> assemblies)
+        {
+            var result = new HandlerScanResult();
+            var requestToHandlerMap = new Dictionary<Type, Type>();
+
+            var candidateTypes = assemblies
+                .SelectMany(a => a.GetLoadableTypes())
+                .Where(t => !t.IsInterface && !t.IsAbstract)
+                .Distinct();
+
+            foreach (var handlerType in candidateTypes)
+            {
+                var interfaces = handlerType.GetInterfaces();
+
+                var requestInterfaces = interfaces
+                    .Where(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IEventHandler<,>))
+                    .ToArray();
+
+                var notificationInterfaces = interfaces
+                    .Where(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IEventHandler<>))
+                    .ToArray();
+
+                if (requestInterfaces.Length == 0 && notificationInterfaces.Length == 0)
+                {
+                    continue;
+                }
+
+                if (handlerType.IsGenericTypeDefinition)
+                {
+                    throw new InvalidOperationException(
+                        $"Handler type '{handlerType.FullName ?? handlerType.Name}' is an open generic type definition and cannot be registered by AddEventBus. " +
+                        "Assembly scanning only registers closed handler types: derive a non-generic handler for each event, " +
+                        "or move the open generic type out of the scanned assemblies.");
+                }
+
+                foreach (var interfaceType in requestInterfaces)
+                {
+                    var genericArgs = interfaceType.GetGenericArguments();
+                    var requestType = genericArgs[0];
+
+                    if (requestToHandlerMap.TryGetValue(requestType, out var existingHandlerType))
+                    {
+                        if (existingHandlerType != handlerType)
+                        {
+                            throw new InvalidOperationException(
+                                $"Duplicate handler registration detected for request type '{requestType.FullName}'. " +
+                                $"Conflicting handlers: '{existingHandlerType.FullName}' and '{handlerType.FullName}'. " +
+                                "A request can only have one handler.");
+                        }
+                        continue;
+                    }
+
+                    requestToHandlerMap[requestType] = handlerType;
+
+                    result.RequestHandlers.Add(new HandlerRegistration(
+                        handlerType,
+                        typeof(IEventHandler<,>).MakeGenericType(interfaceType.GenericTypeArguments),
+                        requestType,
+                        genericArgs[1]));
+                }
+
+                foreach (var interfaceType in notificationInterfaces)
+                {
+                    result.NotificationHandlers.Add(new HandlerRegistration(
+                        handlerType,
+                        typeof(IEventHandler<>).MakeGenericType(interfaceType.GenericTypeArguments),
+                        interfaceType.GetGenericArguments()[0],
+                        null));
+                }
+            }
+
+            return result;
+        }
+
+        private static T? ExistingInstance<T>(IServiceCollection services) where T : class
+        {
+            return services.LastOrDefault(d => d.ServiceType == typeof(T) && !d.IsKeyedService)?.ImplementationInstance as T;
         }
     }
 }

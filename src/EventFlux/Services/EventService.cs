@@ -1,9 +1,11 @@
 using System.Reflection;
 using System.Collections.Concurrent;
+using System.Diagnostics.CodeAnalysis;
 using System.Collections.Generic;
 using System.Linq;
 using System;
 using EventFlux.Abstractions;
+using EventFlux.Internal;
 
 namespace EventFlux.Services
 {
@@ -98,6 +100,12 @@ namespace EventFlux.Services
             inner.TryAdd(handlerType, 0);
         }
 
+        internal void Subscribe(Type eventType, Type handlerType)
+        {
+            var inner = _internalEventHandlers.GetOrAdd(eventType, _ => new ConcurrentDictionary<Type, byte>());
+            inner.TryAdd(handlerType, 0);
+        }
+
         /// <summary>
         /// Gets the list of handler types registered for the specified event type.
         /// </summary>
@@ -162,10 +170,11 @@ namespace EventFlux.Services
         /// <summary>
         /// Scans configured assemblies to discover and register event handler types.
         /// </summary>
+        [RequiresUnreferencedCode(AotMessages.UnreferencedCode)]
         public void FindEventHandlers()
         {
             var handlerTypes = _assemblies
-               .SelectMany(a => a.GetTypes())
+               .SelectMany(a => a.GetLoadableTypes())
                .Where(t => !t.IsInterface && !t.IsAbstract)
                .Where(t => t.GetInterfaces().Any(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IEventHandler<,>) || i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IEventHandler<>)));
 

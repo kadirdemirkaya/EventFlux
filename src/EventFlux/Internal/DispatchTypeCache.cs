@@ -1,10 +1,13 @@
 using System.Collections.Concurrent;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq.Expressions;
 using System.Reflection;
 using EventFlux.Abstractions;
 
 namespace EventFlux.Internal
 {
+    [RequiresDynamicCode(AotMessages.DynamicCode)]
+    [RequiresUnreferencedCode(AotMessages.UnreferencedCode)]
     internal static class DispatchTypeCache
     {
         private static readonly ConcurrentDictionary<Type, Type> NotificationHandlerTypes = new();
