@@ -5,6 +5,7 @@ using EventFlux.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
@@ -14,6 +15,8 @@ namespace EventFlux
     /// <summary>
     /// Default scoped implementation of <see cref="IEventBus"/> providing request-response and notification dispatching.
     /// </summary>
+    [RequiresDynamicCode(AotMessages.DynamicCode)]
+    [RequiresUnreferencedCode(AotMessages.UnreferencedCode)]
     public class EventBus : IEventBus
     {
         private readonly ILogger<EventBus>? _logger;

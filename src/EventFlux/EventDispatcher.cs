@@ -7,6 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Concurrent;
+using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 
 namespace EventFlux
@@ -14,6 +15,8 @@ namespace EventFlux
     /// <summary>
     /// Transient implementation of <see cref="IEventDispatcher"/> supporting custom pipeline behaviors.
     /// </summary>
+    [RequiresDynamicCode(AotMessages.DynamicCode)]
+    [RequiresUnreferencedCode(AotMessages.UnreferencedCode)]
     public class EventDispatcher : IEventDispatcher
     {
         private readonly IServiceProvider _serviceProvider;

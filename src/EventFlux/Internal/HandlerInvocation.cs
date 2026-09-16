@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 
 namespace EventFlux.Internal
@@ -17,6 +18,8 @@ namespace EventFlux.Internal
         public HandlerAccessor Accessor { get; }
     }
 
+    [RequiresDynamicCode(AotMessages.DynamicCode)]
+    [RequiresUnreferencedCode(AotMessages.UnreferencedCode)]
     internal static class HandlerInvocationBuilder
     {
         public static IReadOnlyList<object?> AsReadOnlyList(IEnumerable<object?> services)

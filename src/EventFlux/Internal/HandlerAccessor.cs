@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq.Expressions;
 using System.Reflection;
 using EventFlux.Abstractions;
@@ -6,6 +7,8 @@ using EventFlux.Attributes;
 
 namespace EventFlux.Internal
 {
+    [RequiresDynamicCode(AotMessages.DynamicCode)]
+    [RequiresUnreferencedCode(AotMessages.UnreferencedCode)]
     internal sealed class HandlerAccessor
     {
         private HandlerAccessor(

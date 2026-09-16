@@ -1,9 +1,11 @@
 using System;
 using System.Reflection;
 using System.Collections.Concurrent;
+using System.Diagnostics.CodeAnalysis;
 using System.Collections.Generic;
 using System.Linq;
 using EventFlux.Abstractions;
+using EventFlux.Internal;
 
 namespace EventFlux.Services
 {
@@ -231,10 +233,11 @@ namespace EventFlux.Services
         /// <summary>
         /// Scans assemblies for request-response handlers and populates mappings.
         /// </summary>
+        [RequiresUnreferencedCode(AotMessages.UnreferencedCode)]
         public void FindEvents()
         {
             var handlerTypesWithResponse = _assemblies
-             .SelectMany(a => a.GetTypes())
+             .SelectMany(a => a.GetLoadableTypes())
              .Where(t => !t.IsInterface && !t.IsAbstract)
              .Where(t => t.GetInterfaces().Any(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IEventHandler<,>)));
 

@@ -304,6 +304,31 @@ public class ProcessPaymentHandler : IEventHandler<ProcessPaymentCommand, Paymen
 > **v2.0 Note:**
 > In v2.0+, `CancellationToken` is a mandatory parameter on `IEventHandler.Handle`. Add `CancellationToken cancellationToken = default` to all handler implementations when upgrading from v1.x.
 
+### 7. Error Handling
+
+The three dispatch operations deliberately handle failures differently. Pick the one whose contract matches what the caller needs:
+
+| Operation | Handler throws | Handler's `CanHandle` returns `false` | No handler registered |
+|---|---|---|---|
+| `SendAsync` | Exception propagates to the caller | Handler is skipped and the result is **`null`** — no exception | `InvalidOperationException` |
+| `PublishAsync` — `Parallel` (default) | All handlers run; afterwards the **first** failing handler's exception is rethrown, others are not observed | Handler is skipped | Completes silently |
+| `PublishAsync` — `Sequential` | Exception is rethrown at once; the **remaining handlers are not invoked** | Handler is skipped | Completes silently |
+| `StackEventDispatcherAsync` | Exception is **logged at error level and not rethrown**; the next queued event is still dispatched | Handler is skipped | Completes silently |
+
+- Because `SendAsync` returns `null` when a handler declines the request, always null-check the response of a handler that implements `CanHandle`.
+- `StackEventDispatcherAsync` checks the `CancellationToken` before each queued event and rethrows the cancellation; queued events not yet dispatched at that point are discarded.
+- With `IEventDispatcher`, exceptions travel back through your pipeline behaviors before reaching the caller, so a behavior can log, translate or handle them. The built-in timeout behavior throws `OperationCanceledException` when the timeout expires.
+
+### 8. Registration Details
+
+- **`AddEventBus` is safe to call more than once.** Modular applications can call it per module: each handler, `IEventBus`, `EventService` and `EventMapService` is registered once, and handlers found by later calls are merged into the existing `EventService` / `EventMapService`.
+- **Partially loadable assemblies are tolerated.** If some types in a scanned assembly cannot be loaded (for example because an optional dependency is missing), those types are skipped and the remaining handlers are registered.
+- **Open generic handlers are rejected at registration.** A scanned handler such as `class AuditHandler<T> : IEventHandler<OrderPlaced>` cannot be constructed by the container, so `AddEventBus` throws an `InvalidOperationException` that names the handler type. Create a non-generic handler for each event instead.
+
+### 9. NativeAOT and Trimming
+
+EventFlux discovers handlers through assembly scanning and dispatches them through runtime-compiled expression trees, so it is **not compatible with NativeAOT** and handler types may be removed by the trimmer. `AddEventBus`, `AddEventDispatcher`, `EventBus` and `EventDispatcher` are annotated with `[RequiresDynamicCode]` and `[RequiresUnreferencedCode]`: projects that set `PublishAot` or `PublishTrimmed` get a build-time warning at the call site instead of a runtime failure.
+
 ---
 
 ## Upgrading to v2.0
