@@ -398,4 +398,5 @@ FodyWeavers.xsd
 *.sln.iml
 *.jpg
 *.png
+!assets/icon.png
 /BlogWeb.Mvc/Data/Seeds/BlogDbSeedContext.cs
