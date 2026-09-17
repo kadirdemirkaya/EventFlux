@@ -73,8 +73,9 @@ namespace EventFlux
         /// Initializes a new instance of the <see cref="EventBus"/> class with assemblies.
         /// </summary>
         /// <param name="serviceProvider">The service provider used to resolve handlers.</param>
-        /// <param name="assemblies">Assemblies containing handlers.</param>
+        /// <param name="assemblies">Ignored: handler discovery no longer scans assemblies passed to this constructor.</param>
         /// <param name="logger">Logger instance.</param>
+        [Obsolete("The 'assemblies' parameter is ignored; use EventBus(IServiceProvider, ILogger<EventBus>, EventFluxOptions?, EventStackService?) or resolve IEventBus from DI after AddEventBus().")]
         public EventBus(IServiceProvider serviceProvider, IEnumerable<Assembly> assemblies, ILogger<EventBus> logger)
             : this(serviceProvider, logger, null)
         {
@@ -84,10 +85,11 @@ namespace EventFlux
         /// Initializes a new instance of the <see cref="EventBus"/> class with services.
         /// </summary>
         /// <param name="serviceProvider">The service provider used to resolve handlers.</param>
-        /// <param name="assemblies">Assemblies containing handlers.</param>
-        /// <param name="dictionaryService">Event service registry.</param>
-        /// <param name="eventDictionaryMapService">Event map service registry.</param>
+        /// <param name="assemblies">Ignored: handler discovery no longer scans assemblies passed to this constructor.</param>
+        /// <param name="dictionaryService">Ignored: not used by this constructor.</param>
+        /// <param name="eventDictionaryMapService">Ignored: not used by this constructor.</param>
         /// <param name="logger">Logger instance.</param>
+        [Obsolete("The 'assemblies', 'dictionaryService' and 'eventDictionaryMapService' parameters are ignored; use EventBus(IServiceProvider, ILogger<EventBus>, EventFluxOptions?, EventStackService?) or resolve IEventBus from DI after AddEventBus().")]
         public EventBus(IServiceProvider serviceProvider, IEnumerable<Assembly> assemblies, EventService dictionaryService, EventMapService eventDictionaryMapService, ILogger<EventBus> logger)
             : this(serviceProvider, logger, null)
         {
@@ -97,11 +99,12 @@ namespace EventFlux
         /// Initializes a new instance of the <see cref="EventBus"/> class with handlers list.
         /// </summary>
         /// <param name="serviceProvider">The service provider used to resolve handlers.</param>
-        /// <param name="assemblies">Assemblies containing handlers.</param>
-        /// <param name="dictionaryService">Event service registry.</param>
-        /// <param name="eventDictionaryMapService">Event map service registry.</param>
-        /// <param name="handlers">Handler types list.</param>
+        /// <param name="assemblies">Ignored: handler discovery no longer scans assemblies passed to this constructor.</param>
+        /// <param name="dictionaryService">Ignored: not used by this constructor.</param>
+        /// <param name="eventDictionaryMapService">Ignored: not used by this constructor.</param>
+        /// <param name="handlers">Ignored: not used by this constructor.</param>
         /// <param name="logger">Logger instance.</param>
+        [Obsolete("The 'assemblies', 'dictionaryService', 'eventDictionaryMapService' and 'handlers' parameters are ignored; use EventBus(IServiceProvider, ILogger<EventBus>, EventFluxOptions?, EventStackService?) or resolve IEventBus from DI after AddEventBus().")]
         public EventBus(IServiceProvider serviceProvider, IEnumerable<Assembly> assemblies, EventService dictionaryService, EventMapService eventDictionaryMapService, IEnumerable<Type> handlers, ILogger<EventBus> logger)
             : this(serviceProvider, logger, null)
         {
@@ -111,12 +114,13 @@ namespace EventFlux
         /// Initializes a new instance of the <see cref="EventBus"/> class with full parameters including options.
         /// </summary>
         /// <param name="serviceProvider">The service provider used to resolve handlers.</param>
-        /// <param name="assemblies">Assemblies containing handlers.</param>
-        /// <param name="dictionaryService">Event service registry.</param>
-        /// <param name="eventDictionaryMapService">Event map service registry.</param>
-        /// <param name="handlers">Handler types list.</param>
+        /// <param name="assemblies">Ignored: handler discovery no longer scans assemblies passed to this constructor.</param>
+        /// <param name="dictionaryService">Ignored: not used by this constructor.</param>
+        /// <param name="eventDictionaryMapService">Ignored: not used by this constructor.</param>
+        /// <param name="handlers">Ignored: not used by this constructor.</param>
         /// <param name="logger">Logger instance.</param>
         /// <param name="options">Configuration options.</param>
+        [Obsolete("The 'assemblies', 'dictionaryService', 'eventDictionaryMapService' and 'handlers' parameters are ignored; use EventBus(IServiceProvider, ILogger<EventBus>, EventFluxOptions?, EventStackService?) or resolve IEventBus from DI after AddEventBus().")]
         public EventBus(IServiceProvider serviceProvider, IEnumerable<Assembly> assemblies, EventService dictionaryService, EventMapService eventDictionaryMapService, IEnumerable<Type> handlers, ILogger<EventBus> logger, EventFluxOptions? options)
             : this(serviceProvider, logger, options)
         {
@@ -126,13 +130,14 @@ namespace EventFlux
         /// Initializes a new instance of the <see cref="EventBus"/> class with full parameters including event stack service.
         /// </summary>
         /// <param name="serviceProvider">The service provider used to resolve handlers.</param>
-        /// <param name="assemblies">Assemblies containing handlers.</param>
-        /// <param name="dictionaryService">Event service registry.</param>
-        /// <param name="eventDictionaryMapService">Event map service registry.</param>
-        /// <param name="handlers">Handler types list.</param>
+        /// <param name="assemblies">Ignored: handler discovery no longer scans assemblies passed to this constructor.</param>
+        /// <param name="dictionaryService">Ignored: not used by this constructor.</param>
+        /// <param name="eventDictionaryMapService">Ignored: not used by this constructor.</param>
+        /// <param name="handlers">Ignored: not used by this constructor.</param>
         /// <param name="logger">Logger instance.</param>
         /// <param name="options">Configuration options.</param>
         /// <param name="eventStackService">Event stack service for deferred batch events.</param>
+        [Obsolete("The 'assemblies', 'dictionaryService', 'eventDictionaryMapService' and 'handlers' parameters are ignored; use EventBus(IServiceProvider, ILogger<EventBus>, EventFluxOptions?, EventStackService?) or resolve IEventBus from DI after AddEventBus().")]
         public EventBus(IServiceProvider serviceProvider, IEnumerable<Assembly> assemblies, EventService dictionaryService, EventMapService eventDictionaryMapService, IEnumerable<Type> handlers, ILogger<EventBus> logger, EventFluxOptions? options, EventStackService? eventStackService)
             : this(serviceProvider, logger, options, eventStackService)
         {
