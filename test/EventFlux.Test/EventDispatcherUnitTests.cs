@@ -8,7 +8,7 @@ using Moq;
 
 namespace EventFlux.Test
 {
-    public class EventDispatcherUnitTests
+    public class EventDispatcherUnitTests : IDisposable
     {
         private readonly ServiceProvider _serviceProvider;
 

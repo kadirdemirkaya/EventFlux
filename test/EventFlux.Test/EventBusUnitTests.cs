@@ -8,10 +8,9 @@ using Moq;
 
 namespace EventFlux.Test.Unit
 {
-    public class EventBusUnitTests
+    public class EventBusUnitTests : IDisposable
     {
         private readonly ServiceProvider _serviceProvider;
-        private readonly Mock<ILogger> _mockLogger;
 
         public EventBusUnitTests()
         {
@@ -68,7 +67,7 @@ namespace EventFlux.Test.Unit
 
             // Act & Assert
             await Assert.ThrowsAsync<ArgumentNullException>(() =>
-                eventBus.SendAsync<TestEventResponse>(null));
+                eventBus.SendAsync<TestEventResponse>(null!));
         }
 
         [Fact]
@@ -127,7 +126,7 @@ namespace EventFlux.Test.Unit
 
             // Act & Assert
             await Assert.ThrowsAsync<ArgumentNullException>(() =>
-                eventBus.PublishAsync(null));
+                eventBus.PublishAsync(null!));
         }
 
         [Fact]

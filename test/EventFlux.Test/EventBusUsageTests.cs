@@ -16,7 +16,6 @@ namespace EventFlux.Test
     public class EventBusUsageTests
     {
         private readonly ServiceProvider _serviceProvider;
-        private readonly Mock<ILogger> _mockLogger;
 
         public EventBusUsageTests()
         {
@@ -41,7 +40,7 @@ namespace EventFlux.Test
             var request = new SendEventRequest { Data = "data-test" };
 
             // Act
-            SendEventResponse response = await eventBus.SendAsync(request);
+            SendEventResponse? response = await eventBus.SendAsync(request);
 
             // Assert
             Assert.NotNull(response);

@@ -6,11 +6,11 @@ namespace EventFlux.Test.Events
 {
     public class SendEventRequest : IEventRequest<SendEventResponse>
     {
-        public string Data { get; set; }
+        public string Data { get; set; } = string.Empty;
     }
     public class SendEventResponse : IEventResponse
     {
-        public string Data { get; set; }
+        public string Data { get; set; } = string.Empty;
         public DateTime CreatedDate { get; set; } = DateTime.UtcNow;
     }
 
