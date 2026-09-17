@@ -172,6 +172,59 @@ Absolute numbers depend on your hardware and runtime — treat them as relative 
 
 ---
 
+## Why EventFlux Instead of MediatR?
+
+MediatR is the most widely used mediator library for .NET, and it is a good one. EventFlux is not a drop-in replacement; it is a different trade-off. These are the honest reasons to pick it — and the cases where MediatR is still the better fit.
+
+- **License.** EventFlux is MIT, with no license key and no revenue tiers. MediatR 12.x and earlier are Apache-2.0; MediatR 13.0 and later ship under a commercial license from Lucky Penny Software that requires license acceptance and a license key (see [mediatr.io](https://mediatr.io/)).
+- **Performance: comparable on `Send`, not faster on `Publish`.** In the benchmark below, `IEventBus.SendAsync` is on par with `IMediator.Send` (78.00 ns vs 76.86 ns) and allocates less (192 B vs 264 B). MediatR is faster at publishing: 67.37 ns vs 188.19 ns for one handler and 117.57 ns vs 268.00 ns for three. `IEventDispatcher` costs more than both because it always builds the pipeline. Performance alone is not a reason to switch.
+- **`CanHandle` preconditions.** A handler can decline a request (`bool CanHandle(TRequest)`) on both `SendAsync` and `PublishAsync`, without extra behaviors or filtering inside `Handle`. MediatR has no equivalent.
+- **`[HandlerOrder]`.** Multi-handler events get an explicit order attribute. In MediatR, handler order follows registration order and cannot be set per handler.
+- **Batteries included.** Parallel or sequential publish via `PublishStrategy`, built-in logging and timeout behaviors, deferred batch dispatch (`AddStackRequestEvent` + `StackEventDispatcherAsync`), and a per-event scope option.
+- **Ecosystem beyond the process.** [EventFlux.RabbitFlow](https://www.nuget.org/packages/EventFlux.RabbitFlow) and [EventFlux.RedisFlow](https://www.nuget.org/packages/EventFlux.RedisFlow) use the same event model for RabbitMQ and Redis. MediatR is in-process only and leaves transports to other libraries.
+
+### MediatR vs. EventFlux Benchmark
+
+Same scenario on both libraries: handlers return a cached completed `Task`, so the numbers show dispatch overhead only. Both libraries use their default settings: EventFlux publishes in `Parallel`, while MediatR's default publisher awaits handlers one after another.
+
+Environment: 13th Gen Intel Core i7-13620H (16 logical cores), Windows 11 25H2, .NET 8.0.31 runtime (x64 RyuJIT, .NET SDK 10.0.401), BenchmarkDotNet v0.15.8 (`ShortRunJob` + `MemoryDiagnoser`), MediatR 12.5.0, EventFlux 2.0.0.
+
+| Operation | MediatR 12.5.0 | EventFlux `IEventBus` | EventFlux `IEventDispatcher` |
+|---|---:|---:|---:|
+| Send | 76.86 ns · 264 B | 78.00 ns · 192 B | 223.31 ns · 384 B |
+| Publish (1 handler) | 67.37 ns · 312 B | 188.19 ns · 296 B | 338.20 ns · 488 B |
+| Publish (3 handlers) | 117.57 ns · 616 B | 268.00 ns · 408 B | 437.34 ns · 592 B |
+
+`ShortRunJob` takes only three iterations, so the error margin is wide (up to ±210 ns on the three-handler MediatR row). Differences of a few nanoseconds are within noise. Reproduce with `dotnet run -c Release --project test/EventBus.Benchmarks` from the [repository](https://github.com/kadirdemirkaya/EventFlux).
+
+### Feature Comparison
+
+| Feature | EventFlux 2.0 | MediatR 12.x / 13+ |
+|---|---|---|
+| License | MIT | Apache-2.0 (12.x) / commercial, license key (13+) |
+| Request / response (`Send`) | ✅ | ✅ |
+| Notifications to many handlers (`Publish`) | ✅ | ✅ |
+| Commands with no response | ✅ `IEventRequest<Unit>` | ✅ `IRequest` |
+| Any type as response | ❌ response must implement `IEventResponse` | ✅ |
+| Pipeline behaviors (open and closed generic) | ✅ `IEventDispatcher` only | ✅ |
+| Pre/post-processors | ❌ (write a behavior) | ✅ |
+| Exception handlers / actions | ❌ (write a behavior) | ✅ |
+| Streaming requests (`IAsyncEnumerable`) | ❌ | ✅ `IStreamRequest` |
+| Custom notification publisher | ⚠️ `Parallel` / `Sequential` only | ✅ `INotificationPublisher` |
+| Parallel publish by default | ✅ | ❌ (sequential; `TaskWhenAllPublisher` available) |
+| Handler precondition (`CanHandle`) | ✅ | ❌ |
+| Explicit handler order (`[HandlerOrder]`) | ✅ | ❌ |
+| Built-in logging and timeout behaviors | ✅ | ❌ |
+| Deferred batch dispatch | ✅ | ❌ |
+| RabbitMQ / Redis transports from the same author | ✅ RabbitFlow, RedisFlow | ❌ |
+| NativeAOT | ❌ (annotated with `[RequiresDynamicCode]`) | see MediatR docs |
+| Supported frameworks | net8.0, net9.0, net10.0 | netstandard2.0 and later |
+| Community, docs, third-party integrations | Small | Large and mature |
+
+**Choose MediatR** if you need streaming requests, pre/post-processors, exception handlers, a custom notification publisher, .NET Framework / netstandard support, or a large community. **Choose EventFlux** if you want an MIT license with no key, handler preconditions and ordering, built-in behaviors, and a path to RabbitMQ or Redis on the same event model.
+
+---
+
 ## Features in Detail
 
 ### 1. Custom Pipeline Behaviors
