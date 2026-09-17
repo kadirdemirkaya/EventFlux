@@ -28,6 +28,7 @@ namespace EventFlux
         /// </summary>
         /// <param name="serviceProvider">The service provider to resolve handlers and behaviors.</param>
         /// <param name="logger">Logger instance.</param>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="serviceProvider"/> or <paramref name="logger"/> is null.</exception>
         public EventDispatcher(IServiceProvider serviceProvider, ILogger<EventDispatcher> logger)
             : this(serviceProvider, logger, null)
         {
@@ -39,11 +40,12 @@ namespace EventFlux
         /// <param name="serviceProvider">The service provider to resolve handlers and behaviors.</param>
         /// <param name="logger">Logger instance.</param>
         /// <param name="options">Configuration options.</param>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="serviceProvider"/> or <paramref name="logger"/> is null.</exception>
         public EventDispatcher(IServiceProvider serviceProvider, ILogger<EventDispatcher> logger, EventFluxOptions? options)
         {
-            _serviceProvider = serviceProvider;
-            _logger = logger;
-            _options = options ?? serviceProvider?.GetService<EventFluxOptions>() ?? new EventFluxOptions();
+            _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _options = options ?? serviceProvider.GetService<EventFluxOptions>() ?? new EventFluxOptions();
         }
 
         /// <inheritdoc />
@@ -52,6 +54,9 @@ namespace EventFlux
            CancellationToken cancellationToken = default)
            where TResponse : IEventResponse
         {
+            if (request is null)
+                throw new ArgumentNullException(nameof(request));
+
             if (_options.CreateScopePerEvent)
             {
                 using var scope = _serviceProvider.CreateScope();
@@ -107,6 +112,9 @@ namespace EventFlux
            IEventRequest request,
            CancellationToken cancellationToken = default)
         {
+            if (request is null)
+                throw new ArgumentNullException(nameof(request));
+
             cancellationToken.ThrowIfCancellationRequested();
 
             if (_options.CreateScopePerEvent)
@@ -168,7 +176,7 @@ namespace EventFlux
                         tasks[i] = InvokeHandlerAsync(orderedHandlers[i], request, ct);
                     }
 
-                    await Task.WhenAll(tasks).ConfigureAwait(false);
+                    await ParallelPublish.WhenAllAsync(tasks).ConfigureAwait(false);
                 }
             };
 

@@ -348,10 +348,11 @@ The three dispatch operations deliberately handle failures differently. Pick the
 | Operation | Handler throws | Handler's `CanHandle` returns `false` | No handler registered |
 |---|---|---|---|
 | `SendAsync` | Exception propagates to the caller | Handler is skipped and the result is **`null`** — no exception | `InvalidOperationException` |
-| `PublishAsync` — `Parallel` (default) | All handlers run; afterwards the **first** failing handler's exception is rethrown, others are not observed | Handler is skipped | Completes silently |
+| `PublishAsync` — `Parallel` (default) | All handlers run; afterwards a single failure is rethrown as is, several failures are thrown together as an **`AggregateException`** holding every handler's exception | Handler is skipped | Completes silently |
 | `PublishAsync` — `Sequential` | Exception is rethrown at once; the **remaining handlers are not invoked** | Handler is skipped | Completes silently |
 | `StackEventDispatcherAsync` | Exception is **logged at error level and not rethrown**; the next queued event is still dispatched | Handler is skipped | Completes silently |
 
+- `IEventBus` and `IEventDispatcher` both throw `ArgumentNullException` when `SendAsync` or `PublishAsync` is called with a `null` request.
 - Because `SendAsync` returns `null` when a handler declines the request, always null-check the response of a handler that implements `CanHandle`.
 - `StackEventDispatcherAsync` checks the `CancellationToken` before each queued event and rethrows the cancellation; queued events not yet dispatched at that point are discarded.
 - With `IEventDispatcher`, exceptions travel back through your pipeline behaviors before reaching the caller, so a behavior can log, translate or handle them. The built-in timeout behavior throws `OperationCanceledException` when the timeout expires.
