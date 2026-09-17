@@ -11,7 +11,7 @@ EventFlux is a lightweight, high-performance in-memory event dispatching and CQR
 ## Key Features
 
 - **Blazing Fast**: Compiled expression tree delegate caching and allocation-lean dispatch — ~113 ns for `SendAsync` and ~225 ns / 424 B for a single-handler `PublishAsync`.
-- **Request / Response**: Send a command or query to a single handler and receive a response via `SendAsync`.
+- **Request / Response**: Send a command or query to a single handler and receive a response via `SendAsync` — or send a command that returns nothing with `IEventRequest<Unit>`.
 - **Publish / Subscribe**: Broadcast notification events to multiple handlers via `PublishAsync`.
 - **Execution Strategies**: Run notification handlers concurrently (`Parallel`) or in guaranteed order (`Sequential`) via `PublishStrategy`.
 - **Cancellation Aware**: First-class `CancellationToken` propagation across dispatchers, pipelines, and handlers.
@@ -46,8 +46,8 @@ In your `Program.cs` / `Startup.cs`:
 ```csharp
 var builder = WebApplication.CreateBuilder(args);
 
-// Register EventFlux and scan assembly for handlers
-builder.Services.AddEventBus(typeof(Program).Assembly);
+// Register EventFlux and scan the assembly that declares Program for handlers
+builder.Services.AddEventBus<Program>();
 
 // Optional: register EventDispatcher when using pipeline behaviors or HandlerOrder
 builder.Services.AddEventDispatcher();
@@ -57,11 +57,13 @@ builder.Services.AddEventLogging();
 builder.Services.AddEventTimeout();
 
 // Register any custom pipeline behaviors
-builder.Services.AddTransient(typeof(IEventCustomPipeline<,>), typeof(ValidationBehavior<,>));
+builder.Services.AddEventOpenBehavior(typeof(ValidationBehavior<,>));
 
 var app = builder.Build();
 app.Run();
 ```
+
+The registration methods live in the `Microsoft.Extensions.DependencyInjection` namespace, so no extra `using` is needed. Existing `using EventFlux.Extensions;` directives keep working.
 
 ---
 
@@ -110,6 +112,27 @@ public class UserController : ControllerBase
     }
 }
 ```
+
+### 3. Commands Without a Response (`Unit`)
+
+A command that returns nothing uses the built-in `Unit` response type, so you don't need an empty response class:
+
+```csharp
+public record DeleteUserCommand(Guid UserId) : IEventRequest<Unit>;
+
+public class DeleteUserHandler : IEventHandler<DeleteUserCommand, Unit>
+{
+    public Task<Unit> Handle(DeleteUserCommand request, CancellationToken cancellationToken)
+    {
+        // Execute business logic...
+        return Unit.Task;
+    }
+}
+
+await _eventBus.SendAsync(new DeleteUserCommand(userId), ct);   // returns Task, nothing to unwrap
+```
+
+`SendAsync(IEventRequest<Unit>)` is available on both `IEventBus` and `IEventDispatcher` (pipeline behaviors still run on the dispatcher).
 
 ---
 
@@ -176,8 +199,16 @@ public class ValidationBehavior<TRequest, TResponse> : IEventCustomPipeline<TReq
 Register your custom pipeline in `Program.cs`:
 
 ```csharp
-builder.Services.AddTransient(typeof(IEventCustomPipeline<,>), typeof(ValidationBehavior<,>));
+// Open generic behavior: runs for every request
+builder.Services.AddEventOpenBehavior(typeof(ValidationBehavior<,>));
+
+// Closed behavior: registered for every IEventCustomPipeline<...> interface it implements
+builder.Services.AddEventBehavior<AuditCreateUserBehavior>();
 ```
+
+Behaviors run in registration order, and registering the same behavior twice has no effect. Both methods accept an optional `ServiceLifetime` (default `Transient`).
+
+`AddEventOpenBehavior` checks the type when you register it. If the type is not an open generic, implements no `IEventCustomPipeline`, or has type parameters that don't map in order onto the interface (for example `Behavior<TRequest> : IEventCustomPipeline<TRequest, MyResponse>`), it throws an `ArgumentException` right away. Otherwise the container would only fail later, when it is built or when an event is dispatched. Registering with `AddTransient(typeof(IEventCustomPipeline<,>), ...)` directly still works too.
 
 ### 2. Multi-Handler Ordering with `[HandlerOrder]`
  
@@ -282,8 +313,14 @@ builder.Services.AddEventDispatcher(options =>
 {
     options.CreateScopePerEvent = false;
     options.PublishStrategy = PublishStrategy.Sequential;
+
+    // Time limit for the built-in AddEventTimeout() behavior
+    // Default is null, which keeps the built-in 30 seconds; Timeout.InfiniteTimeSpan disables the limit
+    options.Timeout = TimeSpan.FromSeconds(10);
 });
 ```
+
+> `EventFluxOptions` is a single shared instance. A call that passes a configure action replaces options set by an earlier call, so set every option in the last `AddEventBus` / `AddEventDispatcher` call that configures them.
 
 ### 6. Cancellation Support (`CancellationToken`)
 
@@ -321,6 +358,8 @@ The three dispatch operations deliberately handle failures differently. Pick the
 
 ### 8. Registration Details
 
+- **Marker-type overload.** `AddEventBus<TMarker>()` and `AddEventBus<TMarker>(options => ...)` scan the assembly that declares `TMarker`. This is the same as `AddEventBus(typeof(TMarker).Assembly)`, but it can't point at the wrong assembly.
+- **Namespace.** `AddEventBus`, `AddEventDispatcher`, `AddEventLogging`, `AddEventTimeout`, `AddEventBehavior` and `AddEventOpenBehavior` are in `Microsoft.Extensions.DependencyInjection` (class `EventFluxServiceCollectionExtensions`). The original `EventFlux.Extensions.EventBusServiceExtension` class still exists and forwards to it, so existing code compiles and runs unchanged, including files that import both namespaces.
 - **`AddEventBus` is safe to call more than once.** Modular applications can call it per module: each handler, `IEventBus`, `EventService` and `EventMapService` is registered once, and handlers found by later calls are merged into the existing `EventService` / `EventMapService`.
 - **Partially loadable assemblies are tolerated.** If some types in a scanned assembly cannot be loaded (for example because an optional dependency is missing), those types are skipped and the remaining handlers are registered.
 - **Open generic handlers are rejected at registration.** A scanned handler such as `class AuditHandler<T> : IEventHandler<OrderPlaced>` cannot be constructed by the container, so `AddEventBus` throws an `InvalidOperationException` that names the handler type. Create a non-generic handler for each event instead.

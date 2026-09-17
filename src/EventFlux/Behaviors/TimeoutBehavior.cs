@@ -1,5 +1,6 @@
 using EventFlux.Abstractions;
 using EventFlux.Delegates;
+using EventFlux.Options;
 using Microsoft.Extensions.Logging;
 
 namespace EventFlux.Behaviors
@@ -12,7 +13,7 @@ namespace EventFlux.Behaviors
         where TRequest : IEventRequest
     {
         private readonly ILogger<TimeoutBehavior<TRequest>> _logger;
-        private readonly double _timeoutSeconds;
+        private readonly TimeSpan _timeout;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="TimeoutBehavior{TRequest}"/> class.
@@ -22,13 +23,29 @@ namespace EventFlux.Behaviors
         public TimeoutBehavior(ILogger<TimeoutBehavior<TRequest>> logger, double timeoutSeconds = 30)
         {
             _logger = logger;
-            _timeoutSeconds = timeoutSeconds;
+            _timeout = TimeSpan.FromSeconds(timeoutSeconds);
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="TimeoutBehavior{TRequest}"/> class with the timeout configured in <see cref="EventFluxOptions"/>.
+        /// </summary>
+        /// <remarks>
+        /// <see cref="EventFluxOptions.Timeout"/> takes precedence; when it is <c>null</c> or <paramref name="options"/> is <c>null</c>,
+        /// <paramref name="timeoutSeconds"/> is used.
+        /// </remarks>
+        /// <param name="logger">The logger instance.</param>
+        /// <param name="options">The EventFlux options supplying <see cref="EventFluxOptions.Timeout"/>.</param>
+        /// <param name="timeoutSeconds">The fallback timeout duration in seconds (default: 30).</param>
+        public TimeoutBehavior(ILogger<TimeoutBehavior<TRequest>> logger, EventFluxOptions? options, double timeoutSeconds = 30)
+        {
+            _logger = logger;
+            _timeout = options?.Timeout ?? TimeSpan.FromSeconds(timeoutSeconds);
         }
 
         /// <inheritdoc />
         public async Task Handle(TRequest request, EventHandlerDelegate next, CancellationToken cancellationToken)
         {
-            using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(_timeoutSeconds));
+            using var timeoutCts = new CancellationTokenSource(_timeout);
             using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
 
             try
@@ -59,7 +76,7 @@ namespace EventFlux.Behaviors
       where TResponse : IEventResponse
     {
         private readonly ILogger<TimeoutBehavior<TRequest, TResponse>> _logger;
-        private readonly double _timeoutSeconds;
+        private readonly TimeSpan _timeout;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="TimeoutBehavior{TRequest, TResponse}"/> class.
@@ -69,7 +86,23 @@ namespace EventFlux.Behaviors
         public TimeoutBehavior(ILogger<TimeoutBehavior<TRequest, TResponse>> logger, double timeoutSeconds = 30)
         {
             _logger = logger;
-            _timeoutSeconds = timeoutSeconds;
+            _timeout = TimeSpan.FromSeconds(timeoutSeconds);
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="TimeoutBehavior{TRequest, TResponse}"/> class with the timeout configured in <see cref="EventFluxOptions"/>.
+        /// </summary>
+        /// <remarks>
+        /// <see cref="EventFluxOptions.Timeout"/> takes precedence; when it is <c>null</c> or <paramref name="options"/> is <c>null</c>,
+        /// <paramref name="timeoutSeconds"/> is used.
+        /// </remarks>
+        /// <param name="logger">The logger instance.</param>
+        /// <param name="options">The EventFlux options supplying <see cref="EventFluxOptions.Timeout"/>.</param>
+        /// <param name="timeoutSeconds">The fallback timeout duration in seconds (default: 30).</param>
+        public TimeoutBehavior(ILogger<TimeoutBehavior<TRequest, TResponse>> logger, EventFluxOptions? options, double timeoutSeconds = 30)
+        {
+            _logger = logger;
+            _timeout = options?.Timeout ?? TimeSpan.FromSeconds(timeoutSeconds);
         }
 
         /// <inheritdoc />
@@ -78,7 +111,7 @@ namespace EventFlux.Behaviors
             EventHandlerDelegate<TResponse> next,
             CancellationToken cancellationToken)
         {
-            using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(_timeoutSeconds));
+            using var timeoutCts = new CancellationTokenSource(_timeout);
             using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
 
             try

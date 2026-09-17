@@ -58,6 +58,23 @@ namespace EventFlux.Abstractions
         Task<TResponse?> SendAsync<TResponse>(IEventRequest<TResponse> request, CancellationToken cancellationToken = default) where TResponse : IEventResponse;
 
         /// <summary>
+        /// Sends a request that returns no value to its single registered request handler.
+        /// </summary>
+        /// <remarks>
+        /// The request is dispatched exactly like <see cref="SendAsync{TResponse}(IEventRequest{TResponse}, CancellationToken)"/>
+        /// with <see cref="Unit"/> as the response type; the <see cref="Unit"/> result is discarded. Call
+        /// <c>SendAsync&lt;Unit&gt;(request)</c> explicitly to observe it.
+        /// </remarks>
+        /// <param name="request">The request to send.</param>
+        /// <param name="cancellationToken">Cancellation token to cancel execution.</param>
+        /// <returns>A task representing the asynchronous send operation.</returns>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="request"/> is null.</exception>
+        /// <exception cref="InvalidOperationException">Thrown when no handler is registered for the request type.</exception>
+        /// <exception cref="OperationCanceledException">Thrown when <paramref name="cancellationToken"/> is cancelled.</exception>
+        Task SendAsync(IEventRequest<Unit> request, CancellationToken cancellationToken = default)
+            => SendAsync<Unit>(request, cancellationToken);
+
+        /// <summary>
         /// Dispatches all events currently accumulated in the deferred execution stack in sequence.
         /// </summary>
         /// <remarks>
