@@ -399,6 +399,14 @@ Run the test suite using the .NET CLI:
 dotnet test
 ```
 
+Test status (measured locally with coverlet): net8.0 / net9.0 / net10.0 · 281 tests passing on each target · 84.7% line coverage, 66.8% branch coverage of the `EventFlux` assembly.
+
+To reproduce the coverage report (Cobertura XML under `test/EventFlux.Test/TestResults/`):
+
+```powershell
+dotnet test --collect:"XPlat Code Coverage"
+```
+
 ---
 
 ## License
