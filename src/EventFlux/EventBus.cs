@@ -245,7 +245,7 @@ namespace EventFlux
                     tasks[i] = InvokeInvocationAsync(invocations[i], request, cancellationToken);
                 }
 
-                await Task.WhenAll(tasks).ConfigureAwait(false);
+                await ParallelPublish.WhenAllAsync(tasks).ConfigureAwait(false);
             }
         }
 

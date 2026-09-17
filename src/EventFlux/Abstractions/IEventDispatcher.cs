@@ -19,8 +19,8 @@ namespace EventFlux.Abstractions
         /// </para>
         /// <list type="bullet">
         /// <item><description><see cref="EventFlux.Options.PublishStrategy.Parallel"/> (default): every handler is started.
-        /// Once all of them have finished, the exception of the first failing handler in handler order is rethrown;
-        /// exceptions of any other failing handlers are not observed.</description></item>
+        /// Once all of them have finished, a single failing handler's exception is rethrown as is; when several handlers
+        /// fail, an <see cref="AggregateException"/> whose inner exceptions hold every handler failure is thrown.</description></item>
         /// <item><description><see cref="EventFlux.Options.PublishStrategy.Sequential"/>: the first failing handler's exception is
         /// rethrown immediately and the remaining handlers are not invoked.</description></item>
         /// </list>
@@ -28,6 +28,7 @@ namespace EventFlux.Abstractions
         /// <param name="request">The notification event to publish.</param>
         /// <param name="cancellationToken">Cancellation token to cancel execution.</param>
         /// <returns>A task representing the asynchronous publish operation.</returns>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="request"/> is null.</exception>
         /// <exception cref="OperationCanceledException">Thrown when <paramref name="cancellationToken"/> is cancelled, or when a timeout behavior registered with <c>AddEventTimeout()</c> expires.</exception>
         Task PublishAsync(IEventRequest request, CancellationToken cancellationToken = default);
 
@@ -44,6 +45,7 @@ namespace EventFlux.Abstractions
         /// <param name="request">The request to send.</param>
         /// <param name="cancellationToken">Cancellation token to cancel execution.</param>
         /// <returns>The response produced by the handler, or <c>null</c> if the handler cannot handle the request.</returns>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="request"/> is null.</exception>
         /// <exception cref="InvalidOperationException">Thrown when no handler is registered for the request type.</exception>
         /// <exception cref="OperationCanceledException">Thrown when the handler or a pipeline behavior observes cancellation of <paramref name="cancellationToken"/>, or when a timeout behavior registered with <c>AddEventTimeout()</c> expires.</exception>
         Task<TResponse?> SendAsync<TResponse>(IEventRequest<TResponse> request, CancellationToken cancellationToken = default) where TResponse : IEventResponse;
@@ -59,6 +61,7 @@ namespace EventFlux.Abstractions
         /// <param name="request">The request to send.</param>
         /// <param name="cancellationToken">Cancellation token to cancel execution.</param>
         /// <returns>A task representing the asynchronous send operation.</returns>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="request"/> is null.</exception>
         /// <exception cref="InvalidOperationException">Thrown when no handler is registered for the request type.</exception>
         /// <exception cref="OperationCanceledException">Thrown when the handler or a pipeline behavior observes cancellation of <paramref name="cancellationToken"/>, or when a timeout behavior registered with <c>AddEventTimeout()</c> expires.</exception>
         Task SendAsync(IEventRequest<Unit> request, CancellationToken cancellationToken = default)

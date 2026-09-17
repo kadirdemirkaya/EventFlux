@@ -3,6 +3,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Linq.Expressions;
 using System.Reflection;
 using EventFlux.Abstractions;
+using EventFlux.Delegates;
 
 namespace EventFlux.Internal
 {
@@ -55,7 +56,15 @@ namespace EventFlux.Internal
 
         private static Func<object, object, object, CancellationToken, object> BuildBehaviorInvoker(Type pipelineInterfaceType)
         {
-            var method = pipelineInterfaceType.GetMethod("Handle")
+            var pipelineArguments = pipelineInterfaceType.GetGenericArguments();
+
+            var nextDelegateType = pipelineArguments.Length == 2
+                ? typeof(EventHandlerDelegate<>).MakeGenericType(pipelineArguments[1])
+                : typeof(EventHandlerDelegate);
+
+            var method = pipelineInterfaceType.GetMethod(
+                "Handle",
+                new[] { pipelineArguments[0], nextDelegateType, typeof(CancellationToken) })
                 ?? throw new InvalidOperationException($"Pipeline Handle method not found for {pipelineInterfaceType.Name}");
 
             var parameters = method.GetParameters();

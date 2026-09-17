@@ -27,8 +27,8 @@ namespace EventFlux.Abstractions
         /// </para>
         /// <list type="bullet">
         /// <item><description><see cref="EventFlux.Options.PublishStrategy.Parallel"/> (default): every handler is started.
-        /// Once all of them have finished, the exception of the first failing handler in handler order is rethrown;
-        /// exceptions of any other failing handlers are not observed.</description></item>
+        /// Once all of them have finished, a single failing handler's exception is rethrown as is; when several handlers
+        /// fail, an <see cref="AggregateException"/> whose inner exceptions hold every handler failure is thrown.</description></item>
         /// <item><description><see cref="EventFlux.Options.PublishStrategy.Sequential"/>: the first failing handler's exception is
         /// rethrown immediately and the remaining handlers are not invoked.</description></item>
         /// </list>
