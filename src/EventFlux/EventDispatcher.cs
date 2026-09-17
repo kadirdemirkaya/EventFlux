@@ -91,9 +91,9 @@ namespace EventFlux
 
             for (var i = behaviors.Count - 1; i >= 0; i--)
             {
-                var behavior = behaviors[i];
+                var behavior = behaviors[i]!;
                 var next = handlerDelegate;
-                var behaviorInvoker = DispatchTypeCache.BehaviorInvoker(behavior!.GetType());
+                var behaviorInvoker = DispatchTypeCache.BehaviorInvoker(behaviorType);
 
                 handlerDelegate = (cancellationToken) =>
                     (Task<TResponse>)behaviorInvoker(behavior, request, next, cancellationToken);
@@ -174,9 +174,9 @@ namespace EventFlux
 
             for (var i = behaviors.Count - 1; i >= 0; i--)
             {
-                var behavior = behaviors[i];
+                var behavior = behaviors[i]!;
                 var next = handlerDelegate;
-                var behaviorInvoker = DispatchTypeCache.BehaviorInvoker(behavior!.GetType());
+                var behaviorInvoker = DispatchTypeCache.BehaviorInvoker(behaviorType);
 
                 handlerDelegate = ct => (Task)behaviorInvoker(behavior, request, next, ct);
             }

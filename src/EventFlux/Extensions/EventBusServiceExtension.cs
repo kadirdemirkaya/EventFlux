@@ -1,326 +1,133 @@
-using EventFlux.Abstractions;
-using EventFlux.Behaviors;
 using EventFlux.Internal;
 using EventFlux.Options;
-using EventFlux.Services;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
-using Microsoft.Extensions.Logging;
+using System.ComponentModel;
 using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 
 namespace EventFlux.Extensions
 {
     /// <summary>
-    /// Extension methods for setting up EventFlux services in an <see cref="IServiceCollection"/>.
+    /// Registration methods kept in the <c>EventFlux.Extensions</c> namespace for compatibility.
     /// </summary>
+    /// <remarks>
+    /// The registration API lives in <see cref="EventFluxServiceCollectionExtensions"/> in the
+    /// <c>Microsoft.Extensions.DependencyInjection</c> namespace. Every member here forwards to it, so existing
+    /// <c>using EventFlux.Extensions;</c> directives and compiled callers keep working, and a file that imports both
+    /// namespaces binds without ambiguity.
+    /// </remarks>
     public static class EventBusServiceExtension
     {
-        /// <summary>
-        /// Registers EventFlux event bus infrastructure, scanning provided assemblies for handlers.
-        /// </summary>
-        /// <remarks>
-        /// Calling this method more than once is safe: handlers, <see cref="EventService"/>, <see cref="EventMapService"/>
-        /// and <see cref="IEventBus"/> are registered only once, and handlers discovered by later calls are merged into
-        /// the existing <see cref="EventService"/> and <see cref="EventMapService"/>. Types that fail to load from an
-        /// assembly are skipped instead of aborting the scan.
-        /// </remarks>
-        /// <param name="services">The service collection to register into.</param>
-        /// <param name="assemblies">Assemblies to scan for event handlers.</param>
-        /// <returns>The service collection for chaining.</returns>
-        /// <exception cref="ArgumentNullException">Thrown when <paramref name="services"/> is null.</exception>
-        /// <exception cref="ArgumentException">Thrown when <paramref name="assemblies"/> is null, empty, or contains only null items.</exception>
-        /// <exception cref="InvalidOperationException">Thrown when duplicate handlers for the same request type are detected, or when a scanned handler is an open generic type definition.</exception>
+        /// <inheritdoc cref="EventFluxServiceCollectionExtensions.AddEventBus(IServiceCollection, Assembly[])"/>
+        [EditorBrowsable(EditorBrowsableState.Never)]
         [RequiresDynamicCode(AotMessages.DynamicCode)]
         [RequiresUnreferencedCode(AotMessages.UnreferencedCode)]
-        public static IServiceCollection AddEventBus(this IServiceCollection services, params Assembly[] assemblies)
+        public static IServiceCollection AddEventBus(IServiceCollection services, params Assembly[] assemblies)
         {
-            return AddEventBus(services, (Action<EventFluxOptions>?)null, assemblies);
+            return EventFluxServiceCollectionExtensions.AddEventBus(services, (Action<EventFluxOptions>?)null, assemblies);
         }
 
-        /// <summary>
-        /// Registers EventFlux event bus infrastructure with custom options, scanning provided assemblies for handlers.
-        /// </summary>
-        /// <remarks>
-        /// Calling this method more than once is safe: handlers, <see cref="EventService"/>, <see cref="EventMapService"/>
-        /// and <see cref="IEventBus"/> are registered only once, and handlers discovered by later calls are merged into
-        /// the existing <see cref="EventService"/> and <see cref="EventMapService"/>. Types that fail to load from an
-        /// assembly are skipped instead of aborting the scan.
-        /// </remarks>
-        /// <param name="services">The service collection to register into.</param>
-        /// <param name="configureOptions">Action to configure <see cref="EventFluxOptions"/>.</param>
-        /// <param name="assemblies">Assemblies to scan for event handlers.</param>
-        /// <returns>The service collection for chaining.</returns>
-        /// <exception cref="ArgumentNullException">Thrown when <paramref name="services"/> is null.</exception>
-        /// <exception cref="ArgumentException">Thrown when <paramref name="assemblies"/> is null, empty, or contains only null items.</exception>
-        /// <exception cref="InvalidOperationException">Thrown when duplicate handlers for the same request type are detected, or when a scanned handler is an open generic type definition.</exception>
+        /// <inheritdoc cref="EventFluxServiceCollectionExtensions.AddEventBus(IServiceCollection, Assembly[])"/>
+        /// <typeparam name="TServices">The service collection type.</typeparam>
+        [EditorBrowsable(EditorBrowsableState.Never)]
         [RequiresDynamicCode(AotMessages.DynamicCode)]
         [RequiresUnreferencedCode(AotMessages.UnreferencedCode)]
-        public static IServiceCollection AddEventBus(this IServiceCollection services, Action<EventFluxOptions>? configureOptions, params Assembly[] assemblies)
+        public static IServiceCollection AddEventBus<TServices>(this TServices services, params Assembly[] assemblies)
+            where TServices : IServiceCollection
         {
-            if (services is null)
-            {
-                throw new ArgumentNullException(nameof(services));
-            }
-
-            if (assemblies is null || assemblies.Length == 0)
-            {
-                throw new ArgumentException("At least one assembly must be provided.", nameof(assemblies));
-            }
-
-            var validAssemblies = assemblies.Where(a => a is not null).Distinct().ToArray();
-            if (validAssemblies.Length == 0)
-            {
-                throw new ArgumentException("At least one valid assembly must be provided.", nameof(assemblies));
-            }
-
-            var scan = ScanHandlerTypes(validAssemblies);
-
-            EventFluxOptions options;
-            if (configureOptions is not null)
-            {
-                options = new EventFluxOptions();
-                configureOptions(options);
-                services.RemoveAll<EventFluxOptions>();
-                services.AddSingleton(options);
-            }
-            else
-            {
-                var existingDescriptor = services.LastOrDefault(d => d.ServiceType == typeof(EventFluxOptions));
-                options = existingDescriptor?.ImplementationInstance as EventFluxOptions ?? new EventFluxOptions();
-                services.TryAddSingleton(options);
-            }
-
-            var eventService = ExistingInstance<EventService>(services);
-            if (eventService is null)
-            {
-                eventService = new EventService(validAssemblies);
-                services.AddSingleton(eventService);
-            }
-
-            var eventMapService = ExistingInstance<EventMapService>(services);
-            if (eventMapService is null)
-            {
-                eventMapService = new EventMapService(validAssemblies);
-                services.AddSingleton(eventMapService);
-            }
-
-            foreach (var registration in scan.RequestHandlers)
-            {
-                services.TryAddEnumerable(new ServiceDescriptor(registration.ServiceType, registration.HandlerType, options.HandlerLifetime));
-                eventService.Subscribe(registration.RequestType, registration.HandlerType);
-                eventMapService.AddMap(registration.RequestType, registration.ResponseType!);
-            }
-
-            foreach (var registration in scan.NotificationHandlers)
-            {
-                services.TryAddEnumerable(new ServiceDescriptor(registration.ServiceType, registration.HandlerType, options.HandlerLifetime));
-                eventService.Subscribe(registration.RequestType, registration.HandlerType);
-            }
-
-            services.TryAddSingleton<EventStackService>();
-
-            services.TryAddScoped<IEventBus>(sp =>
-                new EventBus(
-                    sp,
-                    sp.GetRequiredService<ILogger<EventBus>>(),
-                    sp.GetService<EventFluxOptions>(),
-                    sp.GetService<EventStackService>()
-                )
-            );
-
-            return services;
+            return EventFluxServiceCollectionExtensions.AddEventBus(services, (Action<EventFluxOptions>?)null, assemblies);
         }
 
-        /// <summary>
-        /// Registers <see cref="IEventDispatcher"/> for pipeline behavior-aware event dispatching.
-        /// </summary>
-        /// <param name="services">The service collection to register into.</param>
-        /// <returns>The service collection for chaining.</returns>
-        /// <exception cref="ArgumentNullException">Thrown when <paramref name="services"/> is null.</exception>
+        /// <inheritdoc cref="EventFluxServiceCollectionExtensions.AddEventBus(IServiceCollection, Action{EventFluxOptions}, Assembly[])"/>
+        [EditorBrowsable(EditorBrowsableState.Never)]
         [RequiresDynamicCode(AotMessages.DynamicCode)]
         [RequiresUnreferencedCode(AotMessages.UnreferencedCode)]
-        public static IServiceCollection AddEventDispatcher(this IServiceCollection services)
+        public static IServiceCollection AddEventBus(IServiceCollection services, Action<EventFluxOptions>? configureOptions, params Assembly[] assemblies)
         {
-            return AddEventDispatcher(services, (Action<EventFluxOptions>?)null);
+            return EventFluxServiceCollectionExtensions.AddEventBus(services, configureOptions, assemblies);
         }
 
-        /// <summary>
-        /// Registers <see cref="IEventDispatcher"/> for pipeline behavior-aware event dispatching with custom options.
-        /// </summary>
-        /// <param name="services">The service collection to register into.</param>
-        /// <param name="configureOptions">Action to configure <see cref="EventFluxOptions"/>.</param>
-        /// <returns>The service collection for chaining.</returns>
-        /// <exception cref="ArgumentNullException">Thrown when <paramref name="services"/> is null.</exception>
+        /// <inheritdoc cref="EventFluxServiceCollectionExtensions.AddEventBus(IServiceCollection, Action{EventFluxOptions}, Assembly[])"/>
+        /// <typeparam name="TServices">The service collection type.</typeparam>
+        [EditorBrowsable(EditorBrowsableState.Never)]
         [RequiresDynamicCode(AotMessages.DynamicCode)]
         [RequiresUnreferencedCode(AotMessages.UnreferencedCode)]
-        public static IServiceCollection AddEventDispatcher(this IServiceCollection services, Action<EventFluxOptions>? configureOptions)
+        public static IServiceCollection AddEventBus<TServices>(this TServices services, Action<EventFluxOptions>? configureOptions, params Assembly[] assemblies)
+            where TServices : IServiceCollection
         {
-            if (services is null)
-            {
-                throw new ArgumentNullException(nameof(services));
-            }
-
-            if (configureOptions is not null)
-            {
-                var options = new EventFluxOptions();
-                configureOptions(options);
-                services.RemoveAll<EventFluxOptions>();
-                services.AddSingleton(options);
-            }
-            else
-            {
-                services.TryAddSingleton<EventFluxOptions>();
-            }
-
-            services.TryAddTransient<IEventDispatcher, EventDispatcher>();
-
-            return services;
+            return EventFluxServiceCollectionExtensions.AddEventBus(services, configureOptions, assemblies);
         }
 
-        /// <summary>
-        /// Registers built-in logging pipeline behaviors for request and notification dispatching.
-        /// </summary>
-        /// <param name="services">The service collection to register into.</param>
-        /// <returns>The service collection for chaining.</returns>
-        /// <exception cref="ArgumentNullException">Thrown when <paramref name="services"/> is null.</exception>
-        public static IServiceCollection AddEventLogging(this IServiceCollection services)
-        {
-            if (services is null)
-            {
-                throw new ArgumentNullException(nameof(services));
-            }
-
-            services.TryAddEnumerable(ServiceDescriptor.Transient(typeof(IEventCustomPipeline<>), typeof(LoggingBehavior<>)));
-            services.TryAddEnumerable(ServiceDescriptor.Transient(typeof(IEventCustomPipeline<,>), typeof(LoggingBehavior<,>)));
-
-            return services;
-        }
-
-        /// <summary>
-        /// Registers built-in timeout pipeline behaviors for request and notification dispatching.
-        /// </summary>
-        /// <param name="services">The service collection to register into.</param>
-        /// <returns>The service collection for chaining.</returns>
-        /// <exception cref="ArgumentNullException">Thrown when <paramref name="services"/> is null.</exception>
-        public static IServiceCollection AddEventTimeout(this IServiceCollection services)
-        {
-            if (services is null)
-            {
-                throw new ArgumentNullException(nameof(services));
-            }
-
-            services.TryAddEnumerable(ServiceDescriptor.Transient(typeof(IEventCustomPipeline<>), typeof(TimeoutBehavior<>)));
-            services.TryAddEnumerable(ServiceDescriptor.Transient(typeof(IEventCustomPipeline<,>), typeof(TimeoutBehavior<,>)));
-
-            return services;
-        }
-
-        private readonly struct HandlerRegistration
-        {
-            public HandlerRegistration(Type handlerType, Type serviceType, Type requestType, Type? responseType)
-            {
-                HandlerType = handlerType;
-                ServiceType = serviceType;
-                RequestType = requestType;
-                ResponseType = responseType;
-            }
-
-            public Type HandlerType { get; }
-
-            public Type ServiceType { get; }
-
-            public Type RequestType { get; }
-
-            public Type? ResponseType { get; }
-        }
-
-        private sealed class HandlerScanResult
-        {
-            public List<HandlerRegistration> RequestHandlers { get; } = new();
-
-            public List<HandlerRegistration> NotificationHandlers { get; } = new();
-        }
-
+        /// <inheritdoc cref="EventFluxServiceCollectionExtensions.AddEventDispatcher(IServiceCollection)"/>
+        [EditorBrowsable(EditorBrowsableState.Never)]
         [RequiresDynamicCode(AotMessages.DynamicCode)]
         [RequiresUnreferencedCode(AotMessages.UnreferencedCode)]
-        private static HandlerScanResult ScanHandlerTypes(IEnumerable<Assembly> assemblies)
+        public static IServiceCollection AddEventDispatcher(IServiceCollection services)
         {
-            var result = new HandlerScanResult();
-            var requestToHandlerMap = new Dictionary<Type, Type>();
-
-            var candidateTypes = assemblies
-                .SelectMany(a => a.GetLoadableTypes())
-                .Where(t => !t.IsInterface && !t.IsAbstract)
-                .Distinct();
-
-            foreach (var handlerType in candidateTypes)
-            {
-                var interfaces = handlerType.GetInterfaces();
-
-                var requestInterfaces = interfaces
-                    .Where(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IEventHandler<,>))
-                    .ToArray();
-
-                var notificationInterfaces = interfaces
-                    .Where(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IEventHandler<>))
-                    .ToArray();
-
-                if (requestInterfaces.Length == 0 && notificationInterfaces.Length == 0)
-                {
-                    continue;
-                }
-
-                if (handlerType.IsGenericTypeDefinition)
-                {
-                    throw new InvalidOperationException(
-                        $"Handler type '{handlerType.FullName ?? handlerType.Name}' is an open generic type definition and cannot be registered by AddEventBus. " +
-                        "Assembly scanning only registers closed handler types: derive a non-generic handler for each event, " +
-                        "or move the open generic type out of the scanned assemblies.");
-                }
-
-                foreach (var interfaceType in requestInterfaces)
-                {
-                    var genericArgs = interfaceType.GetGenericArguments();
-                    var requestType = genericArgs[0];
-
-                    if (requestToHandlerMap.TryGetValue(requestType, out var existingHandlerType))
-                    {
-                        if (existingHandlerType != handlerType)
-                        {
-                            throw new InvalidOperationException(
-                                $"Duplicate handler registration detected for request type '{requestType.FullName}'. " +
-                                $"Conflicting handlers: '{existingHandlerType.FullName}' and '{handlerType.FullName}'. " +
-                                "A request can only have one handler.");
-                        }
-                        continue;
-                    }
-
-                    requestToHandlerMap[requestType] = handlerType;
-
-                    result.RequestHandlers.Add(new HandlerRegistration(
-                        handlerType,
-                        typeof(IEventHandler<,>).MakeGenericType(interfaceType.GenericTypeArguments),
-                        requestType,
-                        genericArgs[1]));
-                }
-
-                foreach (var interfaceType in notificationInterfaces)
-                {
-                    result.NotificationHandlers.Add(new HandlerRegistration(
-                        handlerType,
-                        typeof(IEventHandler<>).MakeGenericType(interfaceType.GenericTypeArguments),
-                        interfaceType.GetGenericArguments()[0],
-                        null));
-                }
-            }
-
-            return result;
+            return EventFluxServiceCollectionExtensions.AddEventDispatcher(services, (Action<EventFluxOptions>?)null);
         }
 
-        private static T? ExistingInstance<T>(IServiceCollection services) where T : class
+        /// <inheritdoc cref="EventFluxServiceCollectionExtensions.AddEventDispatcher(IServiceCollection)"/>
+        /// <typeparam name="TServices">The service collection type.</typeparam>
+        [EditorBrowsable(EditorBrowsableState.Never)]
+        [RequiresDynamicCode(AotMessages.DynamicCode)]
+        [RequiresUnreferencedCode(AotMessages.UnreferencedCode)]
+        public static IServiceCollection AddEventDispatcher<TServices>(this TServices services)
+            where TServices : IServiceCollection
         {
-            return services.LastOrDefault(d => d.ServiceType == typeof(T) && !d.IsKeyedService)?.ImplementationInstance as T;
+            return EventFluxServiceCollectionExtensions.AddEventDispatcher(services, (Action<EventFluxOptions>?)null);
+        }
+
+        /// <inheritdoc cref="EventFluxServiceCollectionExtensions.AddEventDispatcher(IServiceCollection, Action{EventFluxOptions})"/>
+        [EditorBrowsable(EditorBrowsableState.Never)]
+        [RequiresDynamicCode(AotMessages.DynamicCode)]
+        [RequiresUnreferencedCode(AotMessages.UnreferencedCode)]
+        public static IServiceCollection AddEventDispatcher(IServiceCollection services, Action<EventFluxOptions>? configureOptions)
+        {
+            return EventFluxServiceCollectionExtensions.AddEventDispatcher(services, configureOptions);
+        }
+
+        /// <inheritdoc cref="EventFluxServiceCollectionExtensions.AddEventDispatcher(IServiceCollection, Action{EventFluxOptions})"/>
+        /// <typeparam name="TServices">The service collection type.</typeparam>
+        [EditorBrowsable(EditorBrowsableState.Never)]
+        [RequiresDynamicCode(AotMessages.DynamicCode)]
+        [RequiresUnreferencedCode(AotMessages.UnreferencedCode)]
+        public static IServiceCollection AddEventDispatcher<TServices>(this TServices services, Action<EventFluxOptions>? configureOptions)
+            where TServices : IServiceCollection
+        {
+            return EventFluxServiceCollectionExtensions.AddEventDispatcher(services, configureOptions);
+        }
+
+        /// <inheritdoc cref="EventFluxServiceCollectionExtensions.AddEventLogging(IServiceCollection)"/>
+        [EditorBrowsable(EditorBrowsableState.Never)]
+        public static IServiceCollection AddEventLogging(IServiceCollection services)
+        {
+            return EventFluxServiceCollectionExtensions.AddEventLogging(services);
+        }
+
+        /// <inheritdoc cref="EventFluxServiceCollectionExtensions.AddEventLogging(IServiceCollection)"/>
+        /// <typeparam name="TServices">The service collection type.</typeparam>
+        [EditorBrowsable(EditorBrowsableState.Never)]
+        public static IServiceCollection AddEventLogging<TServices>(this TServices services)
+            where TServices : IServiceCollection
+        {
+            return EventFluxServiceCollectionExtensions.AddEventLogging(services);
+        }
+
+        /// <inheritdoc cref="EventFluxServiceCollectionExtensions.AddEventTimeout(IServiceCollection)"/>
+        [EditorBrowsable(EditorBrowsableState.Never)]
+        public static IServiceCollection AddEventTimeout(IServiceCollection services)
+        {
+            return EventFluxServiceCollectionExtensions.AddEventTimeout(services);
+        }
+
+        /// <inheritdoc cref="EventFluxServiceCollectionExtensions.AddEventTimeout(IServiceCollection)"/>
+        /// <typeparam name="TServices">The service collection type.</typeparam>
+        [EditorBrowsable(EditorBrowsableState.Never)]
+        public static IServiceCollection AddEventTimeout<TServices>(this TServices services)
+            where TServices : IServiceCollection
+        {
+            return EventFluxServiceCollectionExtensions.AddEventTimeout(services);
         }
     }
 }

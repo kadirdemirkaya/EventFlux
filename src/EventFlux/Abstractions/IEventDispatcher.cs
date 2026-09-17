@@ -47,5 +47,21 @@ namespace EventFlux.Abstractions
         /// <exception cref="InvalidOperationException">Thrown when no handler is registered for the request type.</exception>
         /// <exception cref="OperationCanceledException">Thrown when the handler or a pipeline behavior observes cancellation of <paramref name="cancellationToken"/>, or when a timeout behavior registered with <c>AddEventTimeout()</c> expires.</exception>
         Task<TResponse?> SendAsync<TResponse>(IEventRequest<TResponse> request, CancellationToken cancellationToken = default) where TResponse : IEventResponse;
+
+        /// <summary>
+        /// Sends a request that returns no value through the pipeline behavior chain to its registered handler.
+        /// </summary>
+        /// <remarks>
+        /// The request is dispatched exactly like <see cref="SendAsync{TResponse}(IEventRequest{TResponse}, CancellationToken)"/>
+        /// with <see cref="Unit"/> as the response type, so <see cref="IEventCustomPipeline{TRequest, TResponse}"/> behaviors
+        /// run around the handler; the <see cref="Unit"/> result is discarded.
+        /// </remarks>
+        /// <param name="request">The request to send.</param>
+        /// <param name="cancellationToken">Cancellation token to cancel execution.</param>
+        /// <returns>A task representing the asynchronous send operation.</returns>
+        /// <exception cref="InvalidOperationException">Thrown when no handler is registered for the request type.</exception>
+        /// <exception cref="OperationCanceledException">Thrown when the handler or a pipeline behavior observes cancellation of <paramref name="cancellationToken"/>, or when a timeout behavior registered with <c>AddEventTimeout()</c> expires.</exception>
+        Task SendAsync(IEventRequest<Unit> request, CancellationToken cancellationToken = default)
+            => SendAsync<Unit>(request, cancellationToken);
     }
 }

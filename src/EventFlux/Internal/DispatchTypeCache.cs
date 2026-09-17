@@ -32,8 +32,8 @@ namespace EventFlux.Internal
         public static InterfaceAccessor ForInterface(Type handlerInterfaceType)
             => InterfaceAccessors.GetOrAdd(handlerInterfaceType, BuildInterfaceAccessor);
 
-        public static Func<object, object, object, CancellationToken, object> BehaviorInvoker(Type behaviorType)
-            => BehaviorInvokers.GetOrAdd(behaviorType, BuildBehaviorInvoker);
+        public static Func<object, object, object, CancellationToken, object> BehaviorInvoker(Type pipelineInterfaceType)
+            => BehaviorInvokers.GetOrAdd(pipelineInterfaceType, BuildBehaviorInvoker);
 
         private static InterfaceAccessor BuildInterfaceAccessor(Type handlerInterfaceType)
         {
@@ -53,10 +53,10 @@ namespace EventFlux.Internal
                     : HandlerAccessor.CompilePredicate(handlerInterfaceType, requestType, canHandleMethod));
         }
 
-        private static Func<object, object, object, CancellationToken, object> BuildBehaviorInvoker(Type behaviorType)
+        private static Func<object, object, object, CancellationToken, object> BuildBehaviorInvoker(Type pipelineInterfaceType)
         {
-            var method = behaviorType.GetMethod("Handle")
-                ?? throw new InvalidOperationException($"Pipeline Handle method not found for {behaviorType.Name}");
+            var method = pipelineInterfaceType.GetMethod("Handle")
+                ?? throw new InvalidOperationException($"Pipeline Handle method not found for {pipelineInterfaceType.Name}");
 
             var parameters = method.GetParameters();
 
@@ -66,7 +66,7 @@ namespace EventFlux.Internal
             var tokenParameter = Expression.Parameter(typeof(CancellationToken), "cancellationToken");
 
             var call = Expression.Call(
-                Expression.Convert(behaviorParameter, behaviorType),
+                Expression.Convert(behaviorParameter, pipelineInterfaceType),
                 method,
                 Expression.Convert(requestParameter, parameters[0].ParameterType),
                 Expression.Convert(nextParameter, parameters[1].ParameterType),
