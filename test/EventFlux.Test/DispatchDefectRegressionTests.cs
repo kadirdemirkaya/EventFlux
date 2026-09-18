@@ -103,6 +103,32 @@ namespace EventFlux.Test
         }
     }
 
+    public class SingleHandlerEvent : IEventRequest
+    {
+        public bool Fail { get; set; }
+
+        public bool Skip { get; set; }
+    }
+
+    public class SingleHandlerOnlyHandler : IEventHandler<SingleHandlerEvent>
+    {
+        public const string Message = "single handler failed";
+
+        public static int Invocations;
+
+        public bool CanHandle(SingleHandlerEvent @event) => !@event.Skip;
+
+        public Task Handle(SingleHandlerEvent @event, CancellationToken cancellationToken)
+        {
+            Interlocked.Increment(ref Invocations);
+
+            if (@event.Fail)
+                throw new InvalidOperationException(Message);
+
+            return Task.CompletedTask;
+        }
+    }
+
     public class DispatchDefectRegressionTests
     {
         private static ServiceProvider BuildProvider(PublishStrategy strategy, Action<IServiceCollection>? configure = null)
@@ -231,6 +257,96 @@ namespace EventFlux.Test
 
             // Assert
             Assert.IsNotType<AggregateException>(exception);
+        }
+
+        [Fact]
+        public async Task EventBus_PublishAsync_Parallel_SingleHandler_InvokesHandler()
+        {
+            // Arrange
+            using var provider = BuildProvider(PublishStrategy.Parallel);
+            var bus = provider.GetRequiredService<IEventBus>();
+            var before = Volatile.Read(ref SingleHandlerOnlyHandler.Invocations);
+
+            // Act
+            await bus.PublishAsync(new SingleHandlerEvent());
+
+            // Assert
+            Assert.Equal(before + 1, Volatile.Read(ref SingleHandlerOnlyHandler.Invocations));
+        }
+
+        [Fact]
+        public async Task EventBus_PublishAsync_Parallel_SingleHandler_WhenFaultsSynchronously_ThrowsOriginalExceptionNotAggregate()
+        {
+            // Arrange
+            using var provider = BuildProvider(PublishStrategy.Parallel);
+            var bus = provider.GetRequiredService<IEventBus>();
+
+            // Act
+            var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+                () => bus.PublishAsync(new SingleHandlerEvent { Fail = true }));
+
+            // Assert
+            Assert.Equal(SingleHandlerOnlyHandler.Message, exception.Message);
+        }
+
+        [Fact]
+        public async Task EventBus_PublishAsync_Parallel_SingleHandler_WhenCanHandleFalse_SkipsHandler()
+        {
+            // Arrange
+            using var provider = BuildProvider(PublishStrategy.Parallel);
+            var bus = provider.GetRequiredService<IEventBus>();
+            var before = Volatile.Read(ref SingleHandlerOnlyHandler.Invocations);
+
+            // Act
+            await bus.PublishAsync(new SingleHandlerEvent { Skip = true });
+
+            // Assert
+            Assert.Equal(before, Volatile.Read(ref SingleHandlerOnlyHandler.Invocations));
+        }
+
+        [Fact]
+        public async Task EventDispatcher_PublishAsync_Parallel_SingleHandler_InvokesHandler()
+        {
+            // Arrange
+            using var provider = BuildProvider(PublishStrategy.Parallel);
+            var dispatcher = provider.GetRequiredService<IEventDispatcher>();
+            var before = Volatile.Read(ref SingleHandlerOnlyHandler.Invocations);
+
+            // Act
+            await dispatcher.PublishAsync(new SingleHandlerEvent());
+
+            // Assert
+            Assert.Equal(before + 1, Volatile.Read(ref SingleHandlerOnlyHandler.Invocations));
+        }
+
+        [Fact]
+        public async Task EventDispatcher_PublishAsync_Parallel_SingleHandler_WhenFaultsSynchronously_ThrowsOriginalExceptionNotAggregate()
+        {
+            // Arrange
+            using var provider = BuildProvider(PublishStrategy.Parallel);
+            var dispatcher = provider.GetRequiredService<IEventDispatcher>();
+
+            // Act
+            var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+                () => dispatcher.PublishAsync(new SingleHandlerEvent { Fail = true }));
+
+            // Assert
+            Assert.Equal(SingleHandlerOnlyHandler.Message, exception.Message);
+        }
+
+        [Fact]
+        public async Task EventDispatcher_PublishAsync_Parallel_SingleHandler_WhenCanHandleFalse_SkipsHandler()
+        {
+            // Arrange
+            using var provider = BuildProvider(PublishStrategy.Parallel);
+            var dispatcher = provider.GetRequiredService<IEventDispatcher>();
+            var before = Volatile.Read(ref SingleHandlerOnlyHandler.Invocations);
+
+            // Act
+            await dispatcher.PublishAsync(new SingleHandlerEvent { Skip = true });
+
+            // Assert
+            Assert.Equal(before, Volatile.Read(ref SingleHandlerOnlyHandler.Invocations));
         }
 
         [Fact]
