@@ -30,6 +30,18 @@ namespace EventFlux.Options
         public ServiceLifetime HandlerLifetime { get; set; } = ServiceLifetime.Transient;
 
         /// <summary>
+        /// Gets or sets a value indicating whether <c>StackEventDispatcherAsync</c> returns undispatched events to the
+        /// shared queue when the caller's <see cref="System.Threading.CancellationToken"/> is cancelled.
+        /// </summary>
+        /// <remarks>
+        /// When <c>false</c> (default), events drained from the queue but not yet dispatched when cancellation is
+        /// observed are discarded. When <c>true</c>, those events are returned to the queue in their original order,
+        /// ahead of any event queued in the meantime. The event whose dispatch was in progress when cancellation
+        /// occurred is never returned, so no event is dispatched twice.
+        /// </remarks>
+        public bool RequeueStackOnCancellation { get; set; } = false;
+
+        /// <summary>
         /// Gets or sets the time limit applied by the built-in timeout behavior registered with <c>AddEventTimeout()</c>.
         /// </summary>
         /// <remarks>
