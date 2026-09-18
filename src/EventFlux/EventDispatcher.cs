@@ -66,7 +66,7 @@ namespace EventFlux
             return await DispatchSendAsync(_serviceProvider, request, cancellationToken).ConfigureAwait(false);
         }
 
-        private async Task<TResponse?> DispatchSendAsync<TResponse>(
+        private Task<TResponse?> DispatchSendAsync<TResponse>(
             IServiceProvider serviceProvider,
             IEventRequest<TResponse> request,
             CancellationToken cancellationToken)
@@ -82,17 +82,24 @@ namespace EventFlux
 
             var accessor = DispatchTypeCache.ForInterface(handlerType);
 
+            if (behaviors.Count == 0)
+                return InvokeSendHandler(accessor, handler, request, handlerType, requestType, cancellationToken)!;
+
+            return BuildSendPipeline(behaviors, behaviorType, accessor, handler, request, handlerType, requestType)(cancellationToken)!;
+        }
+
+        private EventHandlerDelegate<TResponse> BuildSendPipeline<TResponse>(
+            IReadOnlyList<object?> behaviors,
+            Type behaviorType,
+            InterfaceAccessor accessor,
+            object handler,
+            IEventRequest<TResponse> request,
+            Type handlerType,
+            Type requestType)
+            where TResponse : IEventResponse
+        {
             EventHandlerDelegate<TResponse> handlerDelegate = (cancellationToken) =>
-            {
-                if (accessor.CanHandle != null && accessor.CanHandle(handler, request) is bool result && !result)
-                {
-                    _logger.LogInformation("Handler {Handler} cannot handle event {EventName}. Skipping.", handlerType.Name, requestType.Name);
-
-                    return Task.FromResult<TResponse>(default!);
-                }
-
-                return (Task<TResponse>)accessor.Handle(handler, request, cancellationToken);
-            };
+                InvokeSendHandler(accessor, handler, request, handlerType, requestType, cancellationToken);
 
             for (var i = behaviors.Count - 1; i >= 0; i--)
             {
@@ -104,7 +111,26 @@ namespace EventFlux
                     (Task<TResponse>)behaviorInvoker(behavior, request, next, cancellationToken);
             }
 
-            return await handlerDelegate(cancellationToken).ConfigureAwait(false);
+            return handlerDelegate;
+        }
+
+        private Task<TResponse> InvokeSendHandler<TResponse>(
+            InterfaceAccessor accessor,
+            object handler,
+            IEventRequest<TResponse> request,
+            Type handlerType,
+            Type requestType,
+            CancellationToken cancellationToken)
+            where TResponse : IEventResponse
+        {
+            if (accessor.CanHandle != null && accessor.CanHandle(handler, request) is bool result && !result)
+            {
+                _logger.LogInformation("Handler {Handler} cannot handle event {EventName}. Skipping.", handlerType.Name, requestType.Name);
+
+                return Task.FromResult<TResponse>(default!);
+            }
+
+            return (Task<TResponse>)accessor.Handle(handler, request, cancellationToken);
         }
 
         /// <inheritdoc />
@@ -128,7 +154,7 @@ namespace EventFlux
             }
         }
 
-        private async Task DispatchPublishAsync(
+        private Task DispatchPublishAsync(
             IServiceProvider serviceProvider,
             IEventRequest request,
             CancellationToken cancellationToken)
@@ -139,58 +165,37 @@ namespace EventFlux
             var handlers = HandlerInvocationBuilder.AsReadOnlyList(serviceProvider.GetServices(handlerInterface));
 
             if (handlers.Count == 0)
-                return;
+                return Task.CompletedTask;
 
             var orderedHandlers = new object[handlers.Count];
-            var priorities = new int[handlers.Count];
 
-            for (var i = 0; i < handlers.Count; i++)
+            if (handlers.Count == 1)
             {
-                var handler = handlers[i]!;
-
-                orderedHandlers[i] = handler;
-                priorities[i] = GetHandlerPriority(handler.GetType(), requestType);
+                orderedHandlers[0] = handlers[0]!;
             }
+            else
+            {
+                var priorities = new int[handlers.Count];
 
-            SortByPriority(orderedHandlers, priorities);
+                for (var i = 0; i < handlers.Count; i++)
+                {
+                    var handler = handlers[i]!;
+
+                    orderedHandlers[i] = handler;
+                    priorities[i] = GetHandlerPriority(handler.GetType(), requestType);
+                }
+
+                SortByPriority(orderedHandlers, priorities);
+            }
 
             var behaviorType = DispatchTypeCache.NotificationPipelineType(requestType);
 
             var behaviors = HandlerInvocationBuilder.AsReadOnlyList(serviceProvider.GetServices(behaviorType));
 
-            EventHandlerDelegate handlerDelegate = async ct =>
-            {
-                if (_options.PublishStrategy == PublishStrategy.Sequential)
-                {
-                    for (var i = 0; i < orderedHandlers.Length; i++)
-                    {
-                        await InvokeHandlerAsync(orderedHandlers[i], request, ct).ConfigureAwait(false);
-                    }
-                }
-                else if (orderedHandlers.Length == 1)
-                {
-                    await InvokeHandlerAsync(orderedHandlers[0], request, ct).ConfigureAwait(false);
-                }
-                else
-                {
-                    var tasks = new Task[orderedHandlers.Length];
-                    var allCompletedSuccessfully = true;
+            if (behaviors.Count == 0)
+                return InvokeHandlersAsync(orderedHandlers, request, cancellationToken);
 
-                    for (var i = 0; i < orderedHandlers.Length; i++)
-                    {
-                        var task = InvokeHandlerAsync(orderedHandlers[i], request, ct);
-                        tasks[i] = task;
-
-                        if (!task.IsCompletedSuccessfully)
-                            allCompletedSuccessfully = false;
-                    }
-
-                    if (!allCompletedSuccessfully)
-                    {
-                        await ParallelPublish.WhenAllAsync(tasks).ConfigureAwait(false);
-                    }
-                }
-            };
+            EventHandlerDelegate handlerDelegate = ct => InvokeHandlersAsync(orderedHandlers, request, ct);
 
             for (var i = behaviors.Count - 1; i >= 0; i--)
             {
@@ -201,7 +206,51 @@ namespace EventFlux
                 handlerDelegate = ct => (Task)behaviorInvoker(behavior, request, next, ct);
             }
 
-            await handlerDelegate(cancellationToken).ConfigureAwait(false);
+            return handlerDelegate(cancellationToken);
+        }
+
+        private Task InvokeHandlersAsync(
+            object[] orderedHandlers,
+            IEventRequest request,
+            CancellationToken ct)
+        {
+            if (orderedHandlers.Length == 1)
+                return InvokeHandlerAsync(orderedHandlers[0], request, ct);
+
+            return InvokeManyHandlersAsync(orderedHandlers, request, ct);
+        }
+
+        private async Task InvokeManyHandlersAsync(
+            object[] orderedHandlers,
+            IEventRequest request,
+            CancellationToken ct)
+        {
+            if (_options.PublishStrategy == PublishStrategy.Sequential)
+            {
+                for (var i = 0; i < orderedHandlers.Length; i++)
+                {
+                    await InvokeHandlerAsync(orderedHandlers[i], request, ct).ConfigureAwait(false);
+                }
+            }
+            else
+            {
+                var tasks = new Task[orderedHandlers.Length];
+                var allCompletedSuccessfully = true;
+
+                for (var i = 0; i < orderedHandlers.Length; i++)
+                {
+                    var task = InvokeHandlerAsync(orderedHandlers[i], request, ct);
+                    tasks[i] = task;
+
+                    if (!task.IsCompletedSuccessfully)
+                        allCompletedSuccessfully = false;
+                }
+
+                if (!allCompletedSuccessfully)
+                {
+                    await ParallelPublish.WhenAllAsync(tasks).ConfigureAwait(false);
+                }
+            }
         }
 
         private static int GetHandlerPriority(Type handlerType, Type requestType)
