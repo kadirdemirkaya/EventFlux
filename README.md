@@ -10,7 +10,7 @@ EventFlux is a lightweight, high-performance in-memory event dispatching and CQR
 
 ## Key Features
 
-- **Blazing Fast**: Compiled expression tree delegate caching and allocation-lean dispatch — ~113 ns for `SendAsync` and ~225 ns / 424 B for a single-handler `PublishAsync`.
+- **Blazing Fast**: Compiled expression tree delegate caching and allocation-lean dispatch — ~105 ns for `SendAsync` and ~158 ns / 184 B for a single-handler `PublishAsync`.
 - **Request / Response**: Send a command or query to a single handler and receive a response via `SendAsync` — or send a command that returns nothing with `IEventRequest<Unit>`.
 - **Publish / Subscribe**: Broadcast notification events to multiple handlers via `PublishAsync`.
 - **Execution Strategies**: Run notification handlers concurrently (`Parallel`) or in guaranteed order (`Sequential`) via `PublishStrategy`.
@@ -145,7 +145,7 @@ EventFlux provides two dispatch interfaces to fit your performance and architect
 | **Primary Focus** | Direct, high-throughput, low-latency dispatch | Extensible pipeline dispatch |
 | **Pipeline Behaviors (`IEventCustomPipeline`)** | ❌ Bypassed (direct invocation) | ✅ Supported (wraps handlers in pipeline) |
 | **`[HandlerOrder]` Support** | ✅ Supported (order-based invocation) | ✅ Supported (order-based invocation) |
-| **Dispatch Overhead** | Minimal (~113 ns send, ~225 ns publish) | Low (~269 ns send, ~376 ns publish — includes pipeline middleware) |
+| **Dispatch Overhead** | Minimal (~105 ns send, ~158 ns publish) | Low (~260 ns send, ~334 ns publish — includes pipeline middleware) |
 | **Publish / Subscribe (`PublishAsync`)** | ✅ Supported | ✅ Supported |
 | **Batch / Stack Dispatch (`AddStackRequestEvent`)** | ✅ Supported | ❌ |
 
@@ -155,18 +155,23 @@ EventFlux provides two dispatch interfaces to fit your performance and architect
 
 ### Benchmarks
 
-Measured with [BenchmarkDotNet](https://github.com/dotnet/BenchmarkDotNet) on .NET 8.0 (`ShortRunJob` +
-`MemoryDiagnoser`), handlers returning `Task.CompletedTask` so the numbers reflect dispatch overhead
+Measured with the repository's own `DispatchOverheadBenchmarks` ([BenchmarkDotNet](https://github.com/dotnet/BenchmarkDotNet) 0.15.8,
+default job, `MemoryDiagnoser`) on a 13th Gen Intel Core i7-13620H, Windows 11 (25H2), .NET SDK 10.0.401 running the
+.NET 8.0.31 runtime (X64 RyuJIT). Handlers return `Task.CompletedTask`, so the numbers reflect dispatch overhead
 rather than handler work.
 
 | Operation | Mean | Allocated |
 |---|---:|---:|
-| `IEventBus.SendAsync` | 113 ns | 320 B |
-| `IEventBus.PublishAsync` (1 handler) | 225 ns | 424 B |
-| `IEventBus.PublishAsync` (3 handlers) | 299 ns | 536 B |
-| `IEventDispatcher.SendAsync` | 269 ns | 512 B |
-| `IEventDispatcher.PublishAsync` (1 handler) | 376 ns | 616 B |
-| `IEventDispatcher.PublishAsync` (3 handlers) | 481 ns | 720 B |
+| `IEventBus.SendAsync` | 105 ns | 192 B |
+| `IEventBus.PublishAsync` (1 handler) | 158 ns | 184 B |
+| `IEventBus.PublishAsync` (3 handlers) | 236 ns | 328 B |
+| `IEventDispatcher.SendAsync` | 260 ns | 384 B |
+| `IEventDispatcher.PublishAsync` (1 handler) | 334 ns | 376 B |
+| `IEventDispatcher.PublishAsync` (3 handlers) | 438 ns | 512 B |
+
+`IEventBus.SendAsync` is bimodal on this machine (mean 105 ns, median 92 ns, StdDev 28 ns); the other rows have a StdDev under 3 ns.
+
+Reproduce with `dotnet run -c Release --project test/EventBus.Benchmarks` (no arguments runs `DispatchOverheadBenchmarks` non-interactively).
 
 Absolute numbers depend on your hardware and runtime — treat them as relative guidance, not a guarantee.
 

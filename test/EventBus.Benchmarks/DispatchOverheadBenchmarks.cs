@@ -7,7 +7,6 @@ using Microsoft.Extensions.DependencyInjection;
 namespace EventBus.Benchmarks
 {
     [MemoryDiagnoser]
-    [ShortRunJob]
     public class DispatchOverheadBenchmarks
     {
         private ServiceProvider _provider = null!;
