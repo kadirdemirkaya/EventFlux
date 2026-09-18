@@ -167,16 +167,28 @@ namespace EventFlux
                         await InvokeHandlerAsync(orderedHandlers[i], request, ct).ConfigureAwait(false);
                     }
                 }
+                else if (orderedHandlers.Length == 1)
+                {
+                    await InvokeHandlerAsync(orderedHandlers[0], request, ct).ConfigureAwait(false);
+                }
                 else
                 {
                     var tasks = new Task[orderedHandlers.Length];
+                    var allCompletedSuccessfully = true;
 
                     for (var i = 0; i < orderedHandlers.Length; i++)
                     {
-                        tasks[i] = InvokeHandlerAsync(orderedHandlers[i], request, ct);
+                        var task = InvokeHandlerAsync(orderedHandlers[i], request, ct);
+                        tasks[i] = task;
+
+                        if (!task.IsCompletedSuccessfully)
+                            allCompletedSuccessfully = false;
                     }
 
-                    await ParallelPublish.WhenAllAsync(tasks).ConfigureAwait(false);
+                    if (!allCompletedSuccessfully)
+                    {
+                        await ParallelPublish.WhenAllAsync(tasks).ConfigureAwait(false);
+                    }
                 }
             };
 

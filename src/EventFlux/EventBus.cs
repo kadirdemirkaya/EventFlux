@@ -241,14 +241,33 @@ namespace EventFlux
                     await ((Task)entry.Accessor.Handle(entry.Handler, request, cancellationToken)).ConfigureAwait(false);
                 }
             }
+            else if (invocationCount == 1)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                var entry = invocations[0];
+
+                if (entry.Accessor.CanHandle != null && !entry.Accessor.CanHandle(entry.Handler, request))
+                    return;
+
+                await ((Task)entry.Accessor.Handle(entry.Handler, request, cancellationToken)).ConfigureAwait(false);
+            }
             else
             {
                 var tasks = new Task[invocationCount];
+                var allCompletedSuccessfully = true;
 
                 for (var i = 0; i < invocationCount; i++)
                 {
-                    tasks[i] = InvokeInvocationAsync(invocations[i], request, cancellationToken);
+                    var task = InvokeInvocationAsync(invocations[i], request, cancellationToken);
+                    tasks[i] = task;
+
+                    if (!task.IsCompletedSuccessfully)
+                        allCompletedSuccessfully = false;
                 }
+
+                if (allCompletedSuccessfully)
+                    return;
 
                 await ParallelPublish.WhenAllAsync(tasks).ConfigureAwait(false);
             }
