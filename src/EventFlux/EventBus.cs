@@ -295,12 +295,24 @@ namespace EventFlux
 
             RequireServiceProvider();
 
-            foreach (var evt in events)
+            for (var i = 0; i < events.Count; i++)
             {
-                cancellationToken.ThrowIfCancellationRequested();
+                if (cancellationToken.IsCancellationRequested)
+                {
+                    if (_options.RequeueStackOnCancellation)
+                        _eventStackDictionaryService.RequeueAhead(events, i);
+
+                    cancellationToken.ThrowIfCancellationRequested();
+                }
+
+                var evt = events[i];
                 try
                 {
                     await PublishAsync(evt, cancellationToken).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    _logger?.LogDebug("Stack dispatch of {EventName} was cancelled by the caller", evt.GetType().Name);
                 }
                 catch (Exception ex)
                 {

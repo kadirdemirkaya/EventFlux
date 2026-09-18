@@ -312,6 +312,10 @@ builder.Services.AddEventBus(options =>
     // Handler Lifetime: Transient, Scoped, or Singleton
     // Default is ServiceLifetime.Transient
     options.HandlerLifetime = ServiceLifetime.Scoped;
+
+    // Deferred Queue: return undispatched events to the shared queue when StackEventDispatcherAsync is cancelled
+    // Default is false (undispatched events are discarded)
+    options.RequeueStackOnCancellation = true;
 }, typeof(Program).Assembly);
 
 builder.Services.AddEventDispatcher(options =>
@@ -355,11 +359,11 @@ The three dispatch operations deliberately handle failures differently. Pick the
 | `SendAsync` | Exception propagates to the caller | Handler is skipped and the result is **`null`** — no exception | `InvalidOperationException` |
 | `PublishAsync` — `Parallel` (default) | All handlers run; afterwards a single failure is rethrown as is, several failures are thrown together as an **`AggregateException`** holding every handler's exception | Handler is skipped | Completes silently |
 | `PublishAsync` — `Sequential` | Exception is rethrown at once; the **remaining handlers are not invoked** | Handler is skipped | Completes silently |
-| `StackEventDispatcherAsync` | Exception is **logged at error level and not rethrown**; the next queued event is still dispatched | Handler is skipped | Completes silently |
+| `StackEventDispatcherAsync` | Exception is **logged at error level and not rethrown**; the next queued event is still dispatched. A cancellation from the caller's token is not logged as a failure | Handler is skipped | Completes silently |
 
 - `IEventBus` and `IEventDispatcher` both throw `ArgumentNullException` when `SendAsync` or `PublishAsync` is called with a `null` request.
 - Because `SendAsync` returns `null` when a handler declines the request, always null-check the response of a handler that implements `CanHandle`.
-- `StackEventDispatcherAsync` checks the `CancellationToken` before each queued event and rethrows the cancellation; queued events not yet dispatched at that point are discarded.
+- `StackEventDispatcherAsync` checks the `CancellationToken` before each queued event and rethrows the cancellation; queued events not yet dispatched at that point are discarded. Set `RequeueStackOnCancellation = true` to put them back into the shared queue instead, in their original order and ahead of events queued in the meantime; the event whose dispatch was in progress is never re-queued, so nothing is dispatched twice. In both modes a cancellation from the caller's token is not logged as a dispatch failure.
 - With `IEventDispatcher`, exceptions travel back through your pipeline behaviors before reaching the caller, so a behavior can log, translate or handle them. The built-in timeout behavior throws `OperationCanceledException` when the timeout expires.
 
 ### 8. Registration Details
