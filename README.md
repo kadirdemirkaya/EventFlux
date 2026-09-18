@@ -386,7 +386,8 @@ EventFlux discovers handlers through assembly scanning and dispatches them throu
 
 ## Upgrading to v2.0
 
-v2.0 contains the following breaking changes:
+See the [changelog](https://github.com/kadirdemirkaya/EventFlux/blob/main/CHANGELOG.md) for the full
+release history. v2.0 contains the following breaking changes:
 
 | Change | Migration |
 |---|---|
