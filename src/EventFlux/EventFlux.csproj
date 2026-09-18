@@ -9,7 +9,7 @@
 		<IsTrimmable>true</IsTrimmable>
 		<GeneratePackageOnBuild>true</GeneratePackageOnBuild>
 		<PackageId>EventFlux</PackageId>
-		<Version>2.0.0</Version>
+		<Version>2.1.0</Version>
 		<Authors>Kadir Demirkaya</Authors>
 		<Copyright>Copyright (c) 2025-2026 Kadir Demirkaya</Copyright>
 		<PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
@@ -19,18 +19,21 @@
 		<RepositoryType>git</RepositoryType>
 		<PackageTags>CQRS EventBus mediator request-response in-memory pipeline publish-subscribe dotnet messaging</PackageTags>
 		<PackageIcon>icon.png</PackageIcon>
-		<AssemblyInformationalVersion>2.0.0</AssemblyInformationalVersion>
+		<AssemblyInformationalVersion>2.1.0</AssemblyInformationalVersion>
 		<PackageReadmeFile>README.md</PackageReadmeFile>
 		<PackageReleaseNotes>
-			v2.0.0 — Breaking Changes and Modernization:
-			- BREAKING: Dropped net6.0 and net7.0 target frameworks; now targeting net8.0, net9.0, and net10.0
-			- BREAKING: IEventHandler.Handle now requires CancellationToken as mandatory parameter (no longer optional overload)
-			- BREAKING: EventMapService moved from EventFlux namespace to EventFlux.Services namespace
-			- BREAKING: CreateScopePerEvent default changed from true to false (ambient scope by default)
-			- Modernized TimeoutBehavior to use WaitAsync for reliable cancellation on all supported TFMs
-			- Distinguished caller cancellation from timeout in TimeoutBehavior (no longer logs false timeout warnings)
-			- Hot-path LINQ and allocation optimizations (Span-based, array-backed, allocation-free dispatch)
-			- Eliminated all nullable warnings and fixed NullReferenceException in parameterless EventService/EventMapService constructors
+			v2.1.0:
+			- Added IEventRequest&lt;Unit&gt; and the built-in Unit response type for fire-and-forget commands
+			- Added AddEventOpenBehavior and AddEventBehavior helpers to register pipeline behaviors with registration-time validation
+			- Added EventFluxOptions.Timeout to configure the built-in timeout behavior's time limit (previously fixed at 30 seconds)
+			- Added AddEventBus&lt;TMarker&gt;() overloads that scan the assembly declaring TMarker
+			- Added EventFluxOptions.RequeueStackOnCancellation (opt-in) to requeue undrained stack events on cancellation
+			- AddEventBus is now safe to call more than once; discovered handlers are merged instead of re-registering shared services
+			- PublishAsync with PublishStrategy.Parallel now aggregates every failing handler's exception into a single AggregateException
+			- Deprecated: the EventBus constructors accepting unused assemblies/dictionaryService/eventDictionaryMapService/handlers parameters are now [Obsolete]; resolve IEventBus from DI after AddEventBus() instead. Building with TreatWarningsAsErrors turns direct calls into a build error (CS0618)
+			- Aligned the net8.0 target's Microsoft.Extensions.* dependencies to 8.x instead of 9.0.0; a net8 app relying on the 9.x abstractions transitively through EventFlux now resolves 8.x and should reference them directly if 9.x is needed
+			- Fixed SendAsync/PublishAsync to throw ArgumentNullException for a null request instead of failing later inside dispatch
+			- Performance: added single-handler and synchronous-completion fast paths to PublishAsync; EventDispatcher skips building its pipeline delegate chain when no behaviors are registered
 		</PackageReleaseNotes>
 		<PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
 		<GenerateDocumentationFile>true</GenerateDocumentationFile>
