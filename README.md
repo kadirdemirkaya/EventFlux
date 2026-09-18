@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="https://raw.githubusercontent.com/kadirdemirkaya/EventFlux/main/assets/icon.png" alt="EventFlux logo" width="112" />
+</p>
+
 # EventFlux
 
 [![NuGet](https://img.shields.io/nuget/v/EventFlux.svg)](https://www.nuget.org/packages/EventFlux)
