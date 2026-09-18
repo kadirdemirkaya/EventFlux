@@ -13,11 +13,11 @@
 		<Authors>Kadir Demirkaya</Authors>
 		<Copyright>Copyright (c) 2025-2026 Kadir Demirkaya</Copyright>
 		<PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
-		<Description>In-process mediator for .NET with ambient DI scope by default, CanHandle handler preconditions, [HandlerOrder] ordering and a path to distributed messaging via EventFlux.RabbitFlow and EventFlux.RedisFlow. Lightweight MediatR alternative with send/publish, pipeline behaviors, built-in logging and timeout, and deferred batch dispatch.</Description>
+		<Description>In-process mediator for .NET with ambient DI scope by default, CanHandle handler preconditions, [HandlerOrder] ordering and a path to distributed messaging via EventFlux.RabbitFlow and EventFlux.RedisFlow. Lightweight in-process CQRS library with send/publish, pipeline behaviors, built-in logging and timeout, and deferred batch dispatch.</Description>
 		<PackageProjectUrl>https://github.com/kadirdemirkaya/EventFlux</PackageProjectUrl>
 		<RepositoryUrl>https://github.com/kadirdemirkaya/EventFlux</RepositoryUrl>
 		<RepositoryType>git</RepositoryType>
-		<PackageTags>CQRS EventBus mediator mediatr-alternative in-memory pipeline publish-subscribe dotnet messaging</PackageTags>
+		<PackageTags>CQRS EventBus mediator request-response in-memory pipeline publish-subscribe dotnet messaging</PackageTags>
 		<PackageIcon>icon.png</PackageIcon>
 		<AssemblyInformationalVersion>2.0.0</AssemblyInformationalVersion>
 		<PackageReadmeFile>README.md</PackageReadmeFile>
