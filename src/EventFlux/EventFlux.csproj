@@ -9,7 +9,7 @@
 		<IsTrimmable>true</IsTrimmable>
 		<GeneratePackageOnBuild>true</GeneratePackageOnBuild>
 		<PackageId>EventFlux</PackageId>
-		<Version>2.1.0</Version>
+		<Version>2.1.1</Version>
 		<Authors>Kadir Demirkaya</Authors>
 		<Copyright>Copyright (c) 2025-2026 Kadir Demirkaya</Copyright>
 		<PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
@@ -19,9 +19,12 @@
 		<RepositoryType>git</RepositoryType>
 		<PackageTags>CQRS EventBus mediator request-response in-memory pipeline publish-subscribe dotnet messaging</PackageTags>
 		<PackageIcon>icon.png</PackageIcon>
-		<AssemblyInformationalVersion>2.1.0</AssemblyInformationalVersion>
+		<AssemblyInformationalVersion>2.1.1</AssemblyInformationalVersion>
 		<PackageReadmeFile>README.md</PackageReadmeFile>
 		<PackageReleaseNotes>
+			v2.1.1:
+			- Maintenance release with no API or behaviour changes; contents are identical to 2.1.0
+
 			v2.1.0:
 			- Added IEventRequest&lt;Unit&gt; and the built-in Unit response type for fire-and-forget commands
 			- Added AddEventOpenBehavior and AddEventBehavior helpers to register pipeline behaviors with registration-time validation

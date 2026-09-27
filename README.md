@@ -35,12 +35,12 @@ EventFlux is a lightweight, high-performance in-memory event dispatching and CQR
 
 Package Manager Console:
 ```powershell
-dotnet add package EventFlux --version 2.1.0
+dotnet add package EventFlux --version 2.1.1
 ```
 
 Or via `<PackageReference>` in your `.csproj`:
 ```xml
-<PackageReference Include="EventFlux" Version="2.1.0" />
+<PackageReference Include="EventFlux" Version="2.1.1" />
 ```
 
 ### 2. Register Services
